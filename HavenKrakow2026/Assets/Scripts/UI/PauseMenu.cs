@@ -7,18 +7,17 @@ public sealed class PauseMenu : MonoBehaviour
     [SerializeField] private GameObject panel;
     [SerializeField] private string mainMenuScene = "MainMenu";
     [SerializeField] private AudioClip uiClick;
+    [SerializeField] private AudioClip backgroundMusic;
 
     private bool paused;
     private float previousTimeScale;
 
     private void Start()
     {
-        FadeTransition.Initialize();
-        var label = panel.GetComponentInChildren<UnityEngine.UI.Text>(true);
+        GameAudio.ApplyVolume();
+        GameAudio.PlayMusic(backgroundMusic);
         foreach (var button in panel.GetComponentsInChildren<UnityEngine.UI.Button>(true))
             button.onClick.AddListener(() => GameAudio.Play(uiClick, .65f));
-        VolumeControl.AddTo((RectTransform)panel.transform, label.font,
-            Vector2.right, new Vector2(-146f, 46f), uiClick);
     }
 
     private void Update()

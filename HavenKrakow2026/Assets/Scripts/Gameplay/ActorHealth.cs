@@ -35,15 +35,24 @@ public sealed class ActorHealth : MonoBehaviour
         Changed?.Invoke();
     }
 
-    public void TakeHit(int damage = 1)
+    public void AddStartingHealth(int bonus)
+    {
+        maxHealth += bonus;
+        Current += bonus;
+    }
+
+    public void TakeHit(int damage = 1, Vector2 direction = default)
     {
         if (Current == 0 || damage <= 0)
             return;
 
         Current = Mathf.Max(0, Current - damage);
+        var defeated = Current == 0 && hideOnDeath;
+        var tint = hideOnDeath ? new Color(1f, .55f, .21f) : new Color(1f, .42f, .59f);
+        ImpactBurst.Spawn(visual, Center, direction, tint, defeated);
         GameAudio.Play(damageSound, .85f);
         UpdateTint();
-        if (Current == 0 && hideOnDeath)
+        if (defeated)
             gameObject.SetActive(false);
         Changed?.Invoke();
     }

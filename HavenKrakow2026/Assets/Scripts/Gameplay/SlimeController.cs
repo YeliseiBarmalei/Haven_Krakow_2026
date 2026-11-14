@@ -28,6 +28,32 @@ public sealed class SlimeController : MonoBehaviour
     [SerializeField] private AudioClip slideSound;
     [SerializeField] private AudioClip damageSound;
 
+    [Header("Slow Motion Afterimages")]
+    [SerializeField, Range(0, 24)] private int afterimageCount = 14;
+    [SerializeField, Min(.01f)] private float afterimageInterval = .025f;
+    [SerializeField, Min(.01f)] private float afterimageLifetime = .48f;
+    [SerializeField, Min(.01f)] private float afterimageSpacing = .13f;
+    [SerializeField] private Color afterimageCyan = new Color(.18f, 1f, .85f, .72f);
+    [SerializeField] private Color afterimageViolet = new Color(.74f, .32f, 1f, .65f);
+    [SerializeField] private AudioClip slowMotionMovementSound;
+    [SerializeField, Range(0f, 1f)] private float slowMotionMovementVolume = .55f;
+
+    private AudioSource slowMotionMovementSource;
+
+    private struct Afterimage
+    {
+        public SpriteRenderer Renderer;
+        public Color Tint;
+        public float BornAt;
+    }
+
+    private Afterimage[] afterimages;
+    private Transform afterimageRoot;
+    private int nextAfterimage;
+    private float nextAfterimageTime;
+    private Vector2 lastAfterimagePosition;
+    private bool emitAfterimages;
+
     private Rigidbody2D body;
     private CircleCollider2D shape;
     private Camera view;
@@ -52,7 +78,7 @@ public sealed class SlimeController : MonoBehaviour
     public Vector2 Position => body.position;
     public float Radius => shape.radius * transform.lossyScale.x;
     public int Pieces { get; private set; }
-    public int Health { get; private set; }
+    public float Health { get; private set; }
     public bool IsInFlight => launched;
     public int MaxHealth => maxHealth;
     public bool CanLaunch { get; set; } = true;
@@ -98,6 +124,131 @@ public sealed class SlimeController : MonoBehaviour
         PieceCollected?.Invoke();
     }
 
+    public void SetSlowMotionAfterimages(bool active)
+    {
+        if (emitAfterimages == active)
+            return;
+
+        emitAfterimages = active;
+        lastAfterimagePosition = transform.position;
+        nextAfterimageTime = Time.time;
+    }
+
+    private void LateUpdate()
+    {
+        UpdateSlowMotionMovementAudio();
+        var now = Time.time;
+        if (afterimages != null)
+        {
+            foreach (var image in afterimages)
+            {
+                if (!image.Renderer.enabled)
+                    continue;
+
+                var remaining = 1f - (now - image.BornAt) / afterimageLifetime;
+                image.Renderer.enabled = remaining > 0f;
+                var tint = image.Tint;
+                tint.a *= Mathf.Clamp01(remaining) * Mathf.Clamp01(remaining);
+                image.Renderer.color = tint;
+            }
+        }
+
+        var position = (Vector2)transform.position;
+        if (!emitAfterimages || afterimageCount == 0 || Time.timeScale <= 0f ||
+            now < nextAfterimageTime || !visual.enabled || visual.sprite == null ||
+            (position - lastAfterimagePosition).sqrMagnitude < afterimageSpacing * afterimageSpacing)
+            return;
+
+        if (afterimages == null)
+            CreateAfterimages();
+
+        ref var imageSlot = ref afterimages[nextAfterimage % afterimages.Length];
+        var ghost = imageSlot.Renderer;
+        imageSlot.Tint = nextAfterimage % 2 == 0 ? afterimageCyan : afterimageViolet;
+        imageSlot.BornAt = now;
+        ghost.sprite = visual.sprite;
+        ghost.flipX = visual.flipX;
+        ghost.flipY = visual.flipY;
+        ghost.color = imageSlot.Tint;
+        ghost.transform.SetPositionAndRotation(transform.position, transform.rotation);
+        ghost.transform.localScale = transform.lossyScale;
+        ghost.enabled = true;
+
+        nextAfterimage++;
+        nextAfterimageTime = now + afterimageInterval;
+        lastAfterimagePosition = position;
+    }
+
+    private void UpdateSlowMotionMovementAudio()
+    {
+        if (slowMotionMovementSound == null)
+            return;
+
+        var speed = body.linearVelocity.magnitude;
+        var audible = emitAfterimages && Time.timeScale > 0f && !FadeTransition.IsBusy && speed > stopSpeed;
+        if (audible && slowMotionMovementSource == null)
+        {
+            slowMotionMovementSource = gameObject.AddComponent<AudioSource>();
+            slowMotionMovementSource.playOnAwake = false;
+            slowMotionMovementSource.loop = true;
+            slowMotionMovementSource.spatialBlend = 0f;
+            slowMotionMovementSource.clip = slowMotionMovementSound;
+            slowMotionMovementSource.volume = 0f;
+        }
+
+        if (slowMotionMovementSource == null)
+            return;
+
+        var targetVolume = audible
+            ? slowMotionMovementVolume * Mathf.Lerp(.45f, 1f, Mathf.Clamp01(speed / launchSpeed))
+            : 0f;
+        slowMotionMovementSource.volume = Mathf.MoveTowards(
+            slowMotionMovementSource.volume, targetVolume, Time.unscaledDeltaTime * 8f);
+
+        if (audible && !slowMotionMovementSource.isPlaying)
+            slowMotionMovementSource.Play();
+        else if (!audible && slowMotionMovementSource.volume == 0f && slowMotionMovementSource.isPlaying)
+            slowMotionMovementSource.Stop();
+    }
+
+    private void CreateAfterimages()
+    {
+        afterimageRoot = new GameObject("Slow Motion Afterimages").transform;
+        afterimages = new Afterimage[afterimageCount];
+        for (var i = 0; i < afterimages.Length; i++)
+        {
+            var ghost = new GameObject("Afterimage").AddComponent<SpriteRenderer>();
+            ghost.transform.SetParent(afterimageRoot, false);
+            ghost.sharedMaterial = visual.sharedMaterial;
+            ghost.sortingLayerID = visual.sortingLayerID;
+            ghost.sortingOrder = visual.sortingOrder - 1;
+            ghost.enabled = false;
+            afterimages[i].Renderer = ghost;
+        }
+    }
+
+    private void OnDisable()
+    {
+        emitAfterimages = false;
+        if (slowMotionMovementSource != null)
+        {
+            slowMotionMovementSource.Stop();
+            slowMotionMovementSource.volume = 0f;
+        }
+        if (afterimages == null)
+            return;
+
+        foreach (var image in afterimages)
+            if (image.Renderer != null)
+                image.Renderer.enabled = false;
+    }
+
+    private void OnDestroy()
+    {
+        if (afterimageRoot != null)
+            Destroy(afterimageRoot.gameObject);
+    }
+
     public bool CanUpgradeSize => sizeUpgrades < 6;
     public float SizeUpgradePercent => growthPerPiece * 100f;
 
@@ -132,6 +283,14 @@ public sealed class SlimeController : MonoBehaviour
         body.position = new Vector2(
             Mathf.Clamp(position.x, bounds.min.x + Radius, bounds.max.x - Radius),
             Mathf.Clamp(position.y, bounds.min.y + Radius, bounds.max.y - Radius));
+    }
+
+    public void SwapTo(Vector2 position)
+    {
+        StopLaunch();
+        HideAim();
+        body.position = position;
+        transform.position = position;
     }
 
     private void Update()
@@ -219,7 +378,7 @@ public sealed class SlimeController : MonoBehaviour
         if (collision.contactCount > 0)
             SlidePastActor(collision.GetContact(0).normal);
         if (!hitEnemy)
-            actor.TakeHit();
+            actor.TakeHit(direction: incomingVelocity);
     }
 
     private void SlidePastActor(Vector2 normal)
@@ -254,12 +413,26 @@ public sealed class SlimeController : MonoBehaviour
         return true;
     }
 
-    public void TakeHit()
+    public void TakeHit(Vector2 direction = default)
     {
-        if (!CanLaunch || launched || Health <= 0)
+        if (launched)
             return;
 
-        Health--;
+        ApplyDamage(1f, direction);
+    }
+
+    public void TakeHazardDamage(float damage)
+    {
+        ApplyDamage(damage, Vector2.down);
+    }
+
+    private void ApplyDamage(float damage, Vector2 direction)
+    {
+        if (!CanLaunch || Health <= 0f)
+            return;
+
+        Health = Mathf.Max(0f, Health - damage);
+        ImpactBurst.Spawn(visual, Position, direction, new Color(.24f, .94f, .89f));
         GameAudio.Play(damageSound, .85f);
         damageFlashUntil = Time.time + .16f;
         visual.color = new Color(1f, .42f, .45f);
@@ -271,7 +444,7 @@ public sealed class SlimeController : MonoBehaviour
         if (Health <= 0 || Health >= MaxHealth)
             return false;
 
-        Health++;
+        Health = Mathf.Min(MaxHealth, Health + 1f);
         HealthChanged?.Invoke();
         return true;
     }

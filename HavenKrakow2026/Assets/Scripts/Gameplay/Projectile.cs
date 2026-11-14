@@ -29,6 +29,13 @@ public sealed class Projectile : MonoBehaviour
         bounceProgress = -1f;
     }
 
+    public void TeleportTo(Vector2 position)
+    {
+        Position = previousPosition = position;
+        bounceProgress = -1f;
+        transform.position = position;
+    }
+
     public void Deflect(Vector2 impact, float hitTime, float slimeSpeed, float arenaSpeed)
     {
         var incomingSpeed = Velocity.magnitude;

@@ -6,35 +6,31 @@ using UnityEngine.UI;
 public sealed class FadeTransition : MonoBehaviour
 {
     private const float Duration = 0.25f;
+    [SerializeField] private Image overlay;
+
     private static FadeTransition instance;
-    private Image overlay;
 
     public static bool IsBusy => instance != null && instance.overlay.raycastTarget;
 
-    public static void Initialize()
+    private void Awake()
     {
-        if (instance == null)
-            CreateOverlay(1f).StartCoroutine(instance.Reveal());
+        instance = this;
+        SetAlpha(1f);
+        overlay.enabled = true;
+        overlay.raycastTarget = true;
     }
 
-    private static FadeTransition CreateOverlay(float alpha)
+    private IEnumerator Start()
     {
-        var root = new GameObject("Fade Transition", typeof(Canvas), typeof(GraphicRaycaster));
-        var canvas = root.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = short.MaxValue;
-        DontDestroyOnLoad(root);
+        yield return FadeTo(0f);
+        overlay.raycastTarget = false;
+        overlay.enabled = false;
+    }
 
-        instance = root.AddComponent<FadeTransition>();
-        var shade = new GameObject("Black Overlay", typeof(Image));
-        shade.transform.SetParent(root.transform, false);
-        instance.overlay = shade.GetComponent<Image>();
-        instance.overlay.color = new Color(0f, 0f, 0f, alpha);
-        var rect = instance.overlay.rectTransform;
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = rect.offsetMax = Vector2.zero;
-        return instance;
+    private void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
     }
 
     public static void Load(string sceneName)
@@ -48,23 +44,29 @@ public sealed class FadeTransition : MonoBehaviour
             return;
         }
 
-        var transition = instance != null ? instance : CreateOverlay(0f);
-        transition.StartCoroutine(transition.SwitchScene(sceneName));
+        if (instance != null)
+            instance.StartCoroutine(instance.SwitchScene(sceneName));
+        else
+        {
+            Time.timeScale = 1f;
+            SceneManager.LoadScene(sceneName);
+        }
     }
 
     private IEnumerator SwitchScene(string sceneName)
     {
+        SetAlpha(0f);
+        overlay.enabled = true;
         overlay.raycastTarget = true;
         yield return FadeTo(1f);
-        yield return SceneManager.LoadSceneAsync(sceneName);
-        Time.timeScale = 1f;
-        yield return Reveal();
-    }
 
-    private IEnumerator Reveal()
-    {
-        yield return FadeTo(0f);
-        overlay.raycastTarget = false;
+        var load = SceneManager.LoadSceneAsync(sceneName);
+        load.allowSceneActivation = false;
+        while (load.progress < .9f)
+            yield return null;
+
+        Time.timeScale = 1f;
+        load.allowSceneActivation = true;
     }
 
     private IEnumerator FadeTo(float target)
@@ -75,9 +77,16 @@ public sealed class FadeTransition : MonoBehaviour
         {
             yield return null;
             elapsed += Time.unscaledDeltaTime;
-            overlay.color = new Color(0f, 0f, 0f, Mathf.Lerp(initial, target, elapsed / Duration));
+            SetAlpha(Mathf.Lerp(initial, target, elapsed / Duration));
         }
 
-        overlay.color = new Color(0f, 0f, 0f, target);
+        SetAlpha(target);
+    }
+
+    private void SetAlpha(float alpha)
+    {
+        var color = overlay.color;
+        color.a = alpha;
+        overlay.color = color;
     }
 }
