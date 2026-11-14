@@ -368,6 +368,7 @@ MonoBehaviour:
   topWall: {fileID: 384628316}
   bottomWall: {fileID: 2012812446}
   shooterPrefab: {fileID: 105, guid: 5b44b2d3d4c3ddf7067555d72ef91f5f, type: 3}
+  balance: {fileID: 11400000, guid: 7eeef58c5cf2452ca79278714f331e69, type: 2}
   waves:
   - shooters:
     - position: {x: -0.66, y: 0.54}
@@ -388,27 +389,17 @@ MonoBehaviour:
   bandageSprite: {fileID: 21300000, guid: 1ed06827b386479f916600cdf19c36a0, type: 3}
   slimeHealSprite: {fileID: 21300000, guid: 49d802993e254ae885896950707109ff, type: 3}
   parrySound: {fileID: 8300000, guid: d5a5866ca5c841c4aeb3944d1cc70464, type: 3}
+  swapSound: {fileID: 8300000, guid: 669c67ac55a449cc822ad9d35ebfaf91, type: 3}
   shieldParrySound: {fileID: 8300000, guid: 4995026d8cad47628c417ce26fee432b, type: 3}
   slowMotionSound: {fileID: 8300000, guid: 551c9391b6b54584a37a520f93c29cf1, type: 3}
   levelUpSound: {fileID: 8300000, guid: 77a12c03357b4d7a8d61bc80d95f4420, type: 3}
   uiClick: {fileID: 8300000, guid: ac0c7648253d45eda9667f771f1a9f25, type: 3}
-  pieceInterval: 10
-  startingUpgradeCost: 2
   hud: {fileID: 1900000194}
   upgradeMenu: {fileID: 1900000243}
   waveNotice: {fileID: 1900000247}
   resultPanel: {fileID: 9100}
   result: {fileID: 9112}
   continueLabel: {fileID: 9132}
-  shieldDuration: 0.1
-  shieldMissCooldown: 15
-  shieldSuccessCooldown: 3
-  shieldPadding: 0
-  shieldReturnBoost: 8
-  shieldRingWidth: 0.11
-  shieldColor: {r: 0.25, g: 0.92, b: 0.62, a: 1}
-  shieldHitColor: {r: 0.77, g: 1, b: 0.94, a: 1}
-  shieldMaterial: {fileID: 0}
 --- !u!1 &9100
 GameObject:
   m_ObjectHideFlags: 0

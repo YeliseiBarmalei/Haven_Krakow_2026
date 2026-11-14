@@ -188,6 +188,7 @@ MonoBehaviour:
   approachSpeed: 3.8
   advancePerShot: 0.42
   repositionSpeed: 1.9
+  eliteQuickStepSpeedMultiplier: 2
   postShotDelay: 1.6
 --- !u!50 &106
 Rigidbody2D:

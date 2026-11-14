@@ -2,7 +2,7 @@
 
 See [the game design document](DESIGN.md) for the current rules, level script, and balance values.
 
-Open `MainMenu` to start Level 1. After winning, **Next Level** opens Level 2. Open `Level01` or `Level02` directly to test either level.
+Open `MainMenu` and choose **Levels**. Level 1 is available immediately. Winning it unlocks Level 2 in the menu and enables the **Next Level** route from the results screen. Open `Level01` or `Level02` directly to test either level.
 
 ## Current gameplay
 

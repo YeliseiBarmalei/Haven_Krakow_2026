@@ -378,7 +378,7 @@ public sealed class SlimeController : MonoBehaviour
         if (collision.contactCount > 0)
             SlidePastActor(collision.GetContact(0).normal);
         if (!hitEnemy)
-            actor.TakeHit(direction: incomingVelocity);
+            actor.TakeHit(.5f, incomingVelocity);
     }
 
     private void SlidePastActor(Vector2 normal)

@@ -34,20 +34,21 @@ public sealed class LevelController : MonoBehaviour
     [SerializeField] private Transform leftWall, rightWall, topWall, bottomWall;
     [SerializeField] private Shooter shooterPrefab;
     [SerializeField] private Wave[] waves;
+    [SerializeField] private LevelBalance balance;
     [SerializeField] private Material fireballMaterial;
     [SerializeField, Min(.1f)] private float fireballRadius = 1.5f;
+    [SerializeField, Min(.6f)] private float fireballAimSpread = 2.8f;
     [SerializeField] private string mainMenuScene = "MainMenu";
     [SerializeField] private string nextLevelScene;
     [SerializeField] private SlimePiece piecePrefab;
     [SerializeField] private Sprite bandageSprite;
     [SerializeField] private Sprite slimeHealSprite;
     [SerializeField] private AudioClip parrySound;
+    [SerializeField] private AudioClip swapSound;
     [SerializeField] private AudioClip shieldParrySound;
     [SerializeField] private AudioClip slowMotionSound;
     [SerializeField] private AudioClip levelUpSound;
     [SerializeField] private AudioClip uiClick;
-    [SerializeField, Min(1f)] private float pieceInterval = 10f;
-    [SerializeField, Min(1)] private int startingUpgradeCost = 2;
     [SerializeField] private ArenaHud hud;
     [SerializeField] private UpgradeMenu upgradeMenu;
     [SerializeField] private Text waveNotice;
@@ -70,22 +71,9 @@ public sealed class LevelController : MonoBehaviour
     private int slimeLevel = 1;
     private int spentPieces;
     private int reflectedDamage = 1;
-    private const float SlowDuration = 3f;
-    private const float SlowCooldown = 18f;
     private float slowRemaining;
     private float slowRecharge;
-    private const float SwapCooldown = 12f;
     private float swapRecharge;
-    [Header("Parry Shield")]
-    [SerializeField, Min(.02f)] private float shieldDuration = .45f;
-    [SerializeField, Min(0f)] private float shieldMissCooldown = 15f;
-    [SerializeField, Min(0f)] private float shieldSuccessCooldown = 3f;
-    [SerializeField, Min(0f)] private float shieldPadding = .15f;
-    [SerializeField, Min(0f)] private float shieldReturnBoost = 8f;
-    [SerializeField, Min(.01f)] private float shieldRingWidth = .11f;
-    [SerializeField] private Color shieldColor = new Color(.25f, .92f, .62f);
-    [SerializeField] private Color shieldHitColor = new Color(.77f, 1f, .94f);
-    [SerializeField] private Material shieldMaterial;
     private float shieldRemaining;
     private float shieldRecharge;
     private bool shieldConnected;
@@ -97,7 +85,7 @@ public sealed class LevelController : MonoBehaviour
     private float waveNoticeUntil;
     private int parries;
     private int enemiesDefeated;
-    private int UpgradeCost => startingUpgradeCost + slimeLevel - 1;
+    private int UpgradeCost => balance.startingUpgradeCost + slimeLevel - 1;
     private string VictoryScene => string.IsNullOrEmpty(nextLevelScene) ? mainMenuScene : nextLevelScene;
     private float fireballTimer;
     private readonly List<FireballHazard> fireballs = new();
@@ -113,7 +101,8 @@ public sealed class LevelController : MonoBehaviour
         slime.PieceCollected += UpdateStatus;
         slime.HealthChanged += OnSlimeHealthChanged;
         grandma.Changed += OnGrandmaHealthChanged;
-        pieceTimer = pieceInterval;
+        pieceTimer = balance.pieceInterval;
+        Canvas.ForceUpdateCanvases();
         SpawnWave();
     }
 
@@ -148,15 +137,15 @@ public sealed class LevelController : MonoBehaviour
         if (slowRemaining == 0f && slowRecharge == 0f && Application.isFocused &&
             Keyboard.current?.spaceKey.wasPressedThisFrame == true)
         {
-            slowRemaining = SlowDuration;
-            slowRecharge = SlowCooldown;
+            slowRemaining = balance.slowDuration;
+            slowRecharge = balance.slowCooldown;
             GameAudio.PlayTransition(slowMotionSound);
         }
 
         if (wasSlow != (slowRemaining > 0f))
             GameAudio.SetPlaybackSpeed(ArenaSpeed);
 
-        hud.SetSlowMotion(slowRemaining, slowRecharge, SlowDuration, SlowCooldown);
+        hud.SetSlowMotion(slowRemaining, slowRecharge, balance.slowDuration, balance.slowCooldown);
         slime.SetSlowMotionAfterimages(slowRemaining > 0f);
     }
 
@@ -176,10 +165,11 @@ public sealed class LevelController : MonoBehaviour
             target.TeleportTo(origin);
             previousSlimePosition = slime.Position;
             Physics2D.SyncTransforms();
-            swapRecharge = SwapCooldown;
+            swapRecharge = balance.swapCooldown;
+            GameAudio.Play(swapSound, balance.swapSoundVolume);
         }
 
-        hud.SetSwap(swapRecharge, SwapCooldown, target != null);
+        hud.SetSwap(swapRecharge, balance.swapCooldown, target != null);
     }
 
     private void UpdateShield()
@@ -189,12 +179,12 @@ public sealed class LevelController : MonoBehaviour
         {
             shieldRemaining = Mathf.Max(0f, shieldRemaining - Time.deltaTime);
             if (shieldRemaining == 0f)
-                shieldRecharge = shieldConnected ? shieldSuccessCooldown : shieldMissCooldown;
+                shieldRecharge = shieldConnected ? balance.shieldSuccessCooldown : balance.shieldMissCooldown;
         }
         else if (shieldRecharge == 0f && Application.isFocused &&
             Keyboard.current?.qKey.wasPressedThisFrame == true)
         {
-            shieldRemaining = shieldDuration;
+            shieldRemaining = balance.shieldDuration;
             shieldConnected = false;
             var bounds = grandma.HitBounds;
             shieldRing.transform.position = bounds.center;
@@ -210,7 +200,7 @@ public sealed class LevelController : MonoBehaviour
         RefreshShield();
     }
 
-    private float ShieldRadius(Bounds bounds) => ((Vector2)bounds.extents).magnitude + shieldPadding;
+    private float ShieldRadius(Bounds bounds) => ((Vector2)bounds.extents).magnitude + balance.shieldPadding;
 
     private void CreateShieldRing()
     {
@@ -219,7 +209,7 @@ public sealed class LevelController : MonoBehaviour
         shieldRing.useWorldSpace = false;
         shieldRing.loop = true;
         shieldRing.positionCount = shieldPoints.Length;
-        shieldRing.sharedMaterial = shieldMaterial != null ? shieldMaterial : grandma.GetComponent<SpriteRenderer>().sharedMaterial;
+        shieldRing.sharedMaterial = balance.shieldMaterial != null ? balance.shieldMaterial : grandma.GetComponent<SpriteRenderer>().sharedMaterial;
         shieldRing.sortingOrder = 6;
         shieldRing.enabled = false;
     }
@@ -227,11 +217,11 @@ public sealed class LevelController : MonoBehaviour
     private void RefreshShield()
     {
         shieldRing.enabled = shieldRemaining > 0f;
-        shieldRing.startWidth = shieldRing.endWidth = shieldRingWidth;
-        var color = shieldConnected ? shieldHitColor : shieldColor;
+        shieldRing.startWidth = shieldRing.endWidth = balance.shieldRingWidth;
+        var color = shieldConnected ? balance.shieldHitColor : balance.shieldColor;
         shieldRing.startColor = shieldRing.endColor = color;
-        hud.SetParry(shieldRemaining, shieldRecharge, shieldDuration,
-            shieldConnected ? shieldSuccessCooldown : shieldMissCooldown);
+        hud.SetParry(shieldRemaining, shieldRecharge, balance.shieldDuration,
+            shieldConnected ? balance.shieldSuccessCooldown : balance.shieldMissCooldown);
     }
 
     private Projectile FindSwapTarget()
@@ -338,7 +328,7 @@ public sealed class LevelController : MonoBehaviour
         pieceTimer -= arenaStep;
         if (pieceTimer <= 0f)
         {
-            pieceTimer = pieceInterval;
+            pieceTimer = balance.pieceInterval;
             ThrowPiece();
         }
 
@@ -385,10 +375,15 @@ public sealed class LevelController : MonoBehaviour
             fireballTimer = .2f;
             return;
         }
+        var playerPosition = slime.Position;
+        var min = (Vector2)bounds.min + Vector2.one * radius;
+        var max = (Vector2)bounds.max - Vector2.one * radius;
         for (var attempt = 0; attempt < 20; attempt++)
         {
-            var point = new Vector2(Random.Range(bounds.min.x + radius, bounds.max.x - radius),
-                Random.Range(bounds.min.y + radius, bounds.max.y - radius));
+            var point = attempt < 16
+                ? playerPosition + Random.insideUnitCircle.normalized * Random.Range(.6f, fireballAimSpread)
+                : new Vector2(Random.Range(min.x, max.x), Random.Range(min.y, max.y));
+            point = Vector2.Max(min, Vector2.Min(max, point));
             if (grandmaBounds.SqrDistance(new Vector3(point.x, point.y, grandmaBounds.center.z)) <= radius * radius)
                 continue;
 
@@ -468,18 +463,39 @@ public sealed class LevelController : MonoBehaviour
         var entrance = target;
         var edgeInset = shooter.WallClearance;
         var visualExtents = shooter.VisualExtents;
+        var restricted = ShooterHudArea(visualExtents);
         if (Mathf.Abs(offset.x) / bounds.extents.x > Mathf.Abs(offset.y) / bounds.extents.y)
         {
             entrance.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x + visualExtents.x + .4f);
             target.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x - edgeInset);
+            if (CrossesHudArea(entrance, target, restricted))
+                target.y = entrance.y = Mathf.Max(bounds.min.y + edgeInset, restricted.yMin - .05f);
         }
         else
         {
             entrance.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y + visualExtents.y + .4f);
             target.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y - edgeInset);
+            if (CrossesHudArea(entrance, target, restricted))
+                target.x = entrance.x = Mathf.Min(bounds.max.x - edgeInset, restricted.xMax + .05f);
         }
 
         shooter.ApproachFrom(entrance, target);
+    }
+
+    public Rect ShooterHudArea(Vector2 extents)
+    {
+        var panel = hud.SlimePanelScreenRect();
+        var depth = arenaCamera.WorldToScreenPoint(Vector3.zero).z;
+        var min = (Vector2)arenaCamera.ScreenToWorldPoint(new Vector3(panel.xMin, panel.yMin, depth));
+        var max = (Vector2)arenaCamera.ScreenToWorldPoint(new Vector3(panel.xMax, panel.yMax, depth));
+        return Rect.MinMaxRect(min.x - extents.x, min.y - extents.y - .25f,
+            max.x + extents.x, max.y + extents.y);
+    }
+
+    public static bool CrossesHudArea(Vector2 start, Vector2 end, Rect area)
+    {
+        return area.Contains(start) || area.Contains(end) ||
+            RectangleEntryTime(start - area.center, end - area.center, area.size * .5f) <= 1f;
     }
 
     private void ThrowPiece()
@@ -540,7 +556,7 @@ public sealed class LevelController : MonoBehaviour
             if (shieldHit <= 1f && shieldHit <= slimeHit && shieldHit <= grandmaHit)
             {
                 shieldConnected = true;
-                ReflectBullet(index, start, end, shieldHit, shieldReturnBoost, shieldParrySound);
+                ReflectBullet(index, start, end, shieldHit, balance.shieldReturnBoost, shieldParrySound);
                 continue;
             }
             if (slimeHit <= 1f && slimeHit <= grandmaHit)
@@ -698,11 +714,13 @@ public sealed class LevelController : MonoBehaviour
     {
         finished = true;
         won = victory;
+        if (victory && !string.IsNullOrEmpty(nextLevelScene))
+            MainMenu.UnlockLevel(nextLevelScene);
         shieldRemaining = 0f;
         RefreshShield();
         slowRemaining = 0f;
         GameAudio.SetPlaybackSpeed(1f);
-        hud.SetSlowMotion(0f, slowRecharge, SlowDuration, SlowCooldown);
+        hud.SetSlowMotion(0f, slowRecharge, balance.slowDuration, balance.slowCooldown);
         slime.SetSlowMotionAfterimages(false);
         waveNotice.enabled = false;
         slime.CanLaunch = false;

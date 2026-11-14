@@ -26,9 +26,10 @@ public sealed class Shooter : MonoBehaviour
     [SerializeField, Min(1f)] private float eliteScale = 1.2f;
     [SerializeField, Min(0)] private int eliteBonusHealth = 2;
     [SerializeField, Min(0f)] private float eliteQuickStepDelay = .25f;
+    [SerializeField, Min(1f)] private float eliteQuickStepSpeedMultiplier = 2f;
     [SerializeField, Min(.1f)] private float eliteBurstInterval = .9f;
-    [SerializeField, Min(.1f)] private float eliteRecovery = 4.5f;
-    [SerializeField, Min(.1f)] private float eliteRestingInterval = 3.4f;
+    private const int EliteBurstShots = 3;
+    private const int EliteCycleShots = 5;
     private int eliteShotIndex;
     public bool IsElite { get; private set; }
 
@@ -92,7 +93,7 @@ public sealed class Shooter : MonoBehaviour
         name = "Elite Shooter";
         transform.localScale *= eliteScale;
         health.AddStartingHealth(eliteBonusHealth);
-        shotsLeft = Mathf.CeilToInt(shotsLeft / 4f) * 4;
+        shotsLeft = Mathf.Max(2, Mathf.CeilToInt(shotsLeft / (float)EliteCycleShots)) * EliteCycleShots;
         Physics2D.SyncTransforms();
     }
 
@@ -102,6 +103,7 @@ public sealed class Shooter : MonoBehaviour
         approachTarget = target;
         body.simulated = false;
         transform.position = entrance;
+        FaceHorizontally(target.x - entrance.x);
     }
 
     public void Tick(ActorHealth target, LevelController level)
@@ -134,18 +136,14 @@ public sealed class Shooter : MonoBehaviour
 
         if (postShotTime > 0f)
         {
-            if (IsElite && eliteShotIndex != 1)
-                cooldown -= step;
             postShotTime -= step;
             if (postShotTime <= 0f)
-                Reposition(target, level.ArenaBounds, level.ProjectileRadius);
+                Reposition(target, level);
             return;
         }
 
         if (repositionTime > 0f)
         {
-            if (IsElite && eliteShotIndex != 1)
-                cooldown -= step;
             repositionTime = Mathf.Max(0f, repositionTime - step);
             if ((body.linearVelocity / motionScale - repositionVelocity).sqrMagnitude < .003f)
             {
@@ -156,8 +154,10 @@ public sealed class Shooter : MonoBehaviour
         }
 
         cooldown -= step;
-        var aggressive = IsElite && eliteShotIndex < 2;
-        var warningWindow = IsElite && eliteShotIndex == 1 ? Mathf.Min(warningDuration, eliteBurstInterval) : warningDuration;
+        var aggressive = IsElite && eliteShotIndex < EliteBurstShots;
+        var warningWindow = IsElite && eliteShotIndex > 0 && aggressive
+            ? Mathf.Min(warningDuration, eliteBurstInterval)
+            : warningDuration;
         if (cooldown > warningWindow)
             return;
 
@@ -170,8 +170,7 @@ public sealed class Shooter : MonoBehaviour
         var direction = offset.normalized;
         if (aimFrame != null && shotAnimationRemaining <= 0f)
         {
-            if (Mathf.Abs(direction.x) > .01f)
-                visual.flipX = direction.x < 0f;
+            FaceHorizontally(direction.x);
             visual.sprite = cooldown <= .14f ? aimFrame : idleFrame;
         }
         var muzzle = health.Center + direction * DistanceToEdge(health.HitBounds, direction);
@@ -191,16 +190,17 @@ public sealed class Shooter : MonoBehaviour
             var stepDelay = postShotDelay;
             if (IsElite)
             {
-                var fired = eliteShotIndex;
-                eliteShotIndex = (eliteShotIndex + 1) % 4;
-                cooldown = fired == 0 ? eliteBurstInterval : fired == 1 ? eliteRecovery : eliteRestingInterval;
-                if (fired == 0)
+                eliteShotIndex = (eliteShotIndex + 1) % EliteCycleShots;
+                if (IsQuickStep)
+                {
+                    cooldown = eliteBurstInterval;
                     stepDelay = eliteQuickStepDelay;
+                }
             }
             if (stepDelay > 0f)
                 postShotTime = stepDelay;
             else
-                Reposition(target, level.ArenaBounds, level.ProjectileRadius);
+                Reposition(target, level);
             return;
         }
 
@@ -213,6 +213,12 @@ public sealed class Shooter : MonoBehaviour
         var tint = aggressive ? new Color(1f, .67f, .23f) : warningTint;
         warning.color = new Color(tint.r, tint.g, tint.b, Mathf.Lerp(.25f, .9f, charge));
         warning.enabled = true;
+    }
+
+    private void FaceHorizontally(float horizontal)
+    {
+        if (Mathf.Abs(horizontal) > .01f)
+            visual.flipX = horizontal < 0f;
     }
 
     private void UpdateShotAnimation(float step)
@@ -239,8 +245,11 @@ public sealed class Shooter : MonoBehaviour
             y > 0f ? bounds.extents.y / y : float.PositiveInfinity);
     }
 
-    private void Reposition(ActorHealth target, Bounds bounds, float projectileRadius)
+    private void Reposition(ActorHealth target, LevelController level)
     {
+        var bounds = level.ArenaBounds;
+        var restricted = level.ShooterHudArea(VisualExtents);
+        var startsInsideHud = restricted.Contains(health.Center);
         var offset = health.Center - target.Center;
         var distance = offset.magnitude;
         var minimumDistance = health.Radius + target.Radius + .55f;
@@ -249,7 +258,7 @@ public sealed class Shooter : MonoBehaviour
         var radius = health.Radius;
         var extents = health.HitBounds.extents;
         var clearance = Mathf.Abs(lastShotSide.x) * extents.x + Mathf.Abs(lastShotSide.y) * extents.y +
-            projectileRadius + .14f;
+            level.ProjectileRadius + .14f;
         stepLeft = !stepLeft;
         var preferredSide = stepLeft ? 1f : -1f;
         var stepAngle = Mathf.Asin(Mathf.Clamp01(clearance / Mathf.Max(stepDistance, .01f))) * Mathf.Rad2Deg;
@@ -263,7 +272,9 @@ public sealed class Shooter : MonoBehaviour
                 var destination = target.Center + (Vector2)(Quaternion.Euler(0f, 0f, turn) * closer);
                 if (destination.x < bounds.min.x + radius || destination.x > bounds.max.x - radius ||
                     destination.y < bounds.min.y + radius || destination.y > bounds.max.y - radius ||
-                    Mathf.Abs(Vector2.Dot(destination - lastShotOrigin, lastShotSide)) < clearance)
+                    Mathf.Abs(Vector2.Dot(destination - lastShotOrigin, lastShotSide)) < clearance ||
+                    restricted.Contains(destination) ||
+                    (!startsInsideHud && LevelController.CrossesHudArea(health.Center, destination, restricted)))
                     continue;
 
                 var candidate = destination - health.Center;
@@ -278,10 +289,15 @@ public sealed class Shooter : MonoBehaviour
         if (travel == Vector2.zero)
             return;
 
-        repositionTime = Mathf.Ceil(travel.magnitude / (repositionSpeed * Time.fixedDeltaTime)) * Time.fixedDeltaTime;
+        var speed = IsQuickStep
+            ? repositionSpeed * eliteQuickStepSpeedMultiplier
+            : repositionSpeed;
+        repositionTime = Mathf.Ceil(travel.magnitude / (speed * Time.fixedDeltaTime)) * Time.fixedDeltaTime;
         repositionVelocity = travel / repositionTime;
         body.linearVelocity = repositionVelocity * (motionScale * (1f + body.linearDamping * Time.fixedDeltaTime));
     }
+
+    private bool IsQuickStep => IsElite && eliteShotIndex > 0 && eliteShotIndex < EliteBurstShots;
 
     public void HideWarning()
     {

@@ -12,7 +12,7 @@ public sealed class ActorHealth : MonoBehaviour
     private SpriteRenderer visual;
     private Color healthyTint;
 
-    public int Current { get; private set; }
+    public float Current { get; private set; }
     public int Max => maxHealth;
     public Vector2 Center => shape.bounds.center;
     public float Radius => shape.bounds.extents.x;
@@ -41,12 +41,12 @@ public sealed class ActorHealth : MonoBehaviour
         Current += bonus;
     }
 
-    public void TakeHit(int damage = 1, Vector2 direction = default)
+    public void TakeHit(float damage = 1f, Vector2 direction = default)
     {
         if (Current == 0 || damage <= 0)
             return;
 
-        Current = Mathf.Max(0, Current - damage);
+        Current = Mathf.Max(0f, Current - damage);
         var defeated = Current == 0 && hideOnDeath;
         var tint = hideOnDeath ? new Color(1f, .55f, .21f) : new Color(1f, .42f, .59f);
         ImpactBurst.Spawn(visual, Center, direction, tint, defeated);
@@ -59,7 +59,7 @@ public sealed class ActorHealth : MonoBehaviour
 
     private void UpdateTint()
     {
-        visual.color = Color.Lerp(healthyTint, injuredTint, 1f - (float)Current / Max);
+        visual.color = Color.Lerp(healthyTint, injuredTint, 1f - Current / Max);
     }
 
     public bool Heal()
@@ -67,7 +67,7 @@ public sealed class ActorHealth : MonoBehaviour
         if (Current <= 0 || Current >= Max)
             return false;
 
-        Current++;
+        Current = Mathf.Min(Max, Current + 1f);
         UpdateTint();
         Changed?.Invoke();
         return true;

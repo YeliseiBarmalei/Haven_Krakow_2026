@@ -20,9 +20,11 @@ public sealed class ArenaHud : MonoBehaviour
     {
         public Shooter Shooter;
         public Bar Bar;
+        public RectTransform Badge;
     }
 
     private readonly List<EnemyBar> enemyBars = new();
+    private readonly Vector3[] panelCorners = new Vector3[4];
     [SerializeField] private Camera arenaCamera;
     [SerializeField] private Bar enemyBarTemplate;
     [SerializeField] private Bar slimeHealth, grandmaHealth, progress;
@@ -64,14 +66,14 @@ public sealed class ArenaHud : MonoBehaviour
         parryBar.fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
     }
 
-    public void SetStatus(int wave, int totalWaves, float slimeHp, int slimeMax, int grandmaHp, int grandmaMax,
+    public void SetStatus(int wave, int totalWaves, float slimeHp, int slimeMax, float grandmaHp, int grandmaMax,
         int level, int pieces, int requiredPieces, int damage)
     {
         slimeHealth.Set(slimeHp, slimeMax);
         grandmaHealth.Set(grandmaHp, grandmaMax);
         progress.Set(pieces, requiredPieces);
         slimeValue.text = $"{slimeHp:0.#}/{slimeMax} HP";
-        grandmaValue.text = $"{grandmaHp}/{grandmaMax} HP";
+        grandmaValue.text = $"{grandmaHp:0.#}/{grandmaMax} HP";
         progressValue.text = $"Lv. {level}    Pieces {pieces}/{requiredPieces}    Return dmg {damage}";
         waveValue.text = $"WAVE {wave} / {totalWaves}";
     }
@@ -81,22 +83,24 @@ public sealed class ArenaHud : MonoBehaviour
         var track = Instantiate(enemyBarTemplate.track, transform);
         var fillIndex = enemyBarTemplate.fill.GetSiblingIndex();
         var bar = new Bar { track = track, fill = (RectTransform)track.GetChild(fillIndex) };
+        var entry = new EnemyBar { Shooter = shooter, Bar = bar };
         if (shooter.IsElite)
         {
             var badge = new GameObject("Elite Skull", typeof(RectTransform)).AddComponent<Text>();
             var rect = badge.rectTransform;
             rect.SetParent(track, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0f, .5f);
-            rect.anchoredPosition = new Vector2(-12f, 0f);
-            rect.sizeDelta = new Vector2(22f, 22f);
+            rect.anchoredPosition = new Vector2(-17f, 0f);
+            rect.sizeDelta = new Vector2(32f, 32f);
             badge.font = waveValue.font;
-            badge.fontSize = 18;
+            badge.fontSize = 28;
             badge.text = "☠";
             badge.alignment = TextAnchor.MiddleCenter;
-            badge.color = new Color(1f, .78f, .38f);
+            badge.color = new Color(1f, .22f, .22f);
             badge.raycastTarget = false;
+            entry.Badge = rect;
         }
-        enemyBars.Add(new EnemyBar { Shooter = shooter, Bar = bar });
+        enemyBars.Add(entry);
     }
 
     public void ClearEnemyBars()
@@ -106,9 +110,18 @@ public sealed class ArenaHud : MonoBehaviour
         enemyBars.Clear();
     }
 
+    public Rect SlimePanelScreenRect()
+    {
+        ((RectTransform)slimeHealth.track.parent).GetWorldCorners(panelCorners);
+        var min = RectTransformUtility.WorldToScreenPoint(null, panelCorners[0]);
+        var max = RectTransformUtility.WorldToScreenPoint(null, panelCorners[2]);
+        return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+    }
+
     private void LateUpdate()
     {
         var root = (RectTransform)transform;
+        var panel = SlimePanelScreenRect();
         for (var i = enemyBars.Count - 1; i >= 0; i--)
         {
             var entry = enemyBars[i];
@@ -124,9 +137,11 @@ public sealed class ArenaHud : MonoBehaviour
             var world = (Vector2)entry.Shooter.transform.position + Vector2.up * (actor.Radius + .16f);
             var screen = arenaCamera.WorldToScreenPoint(world);
             var visible = entry.Shooter.CanBeHit && screen.z > 0f && arenaCamera.pixelRect.Contains(screen);
-            track.gameObject.SetActive(visible);
             if (!visible)
+            {
+                track.gameObject.SetActive(false);
                 continue;
+            }
 
             RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, null, out var point);
             var halfWidth = track.sizeDelta.x * .5f + 4f;
@@ -134,6 +149,16 @@ public sealed class ArenaHud : MonoBehaviour
             track.anchoredPosition = new Vector2(
                 Mathf.Clamp(point.x, root.rect.xMin + halfWidth, root.rect.xMax - halfWidth),
                 Mathf.Clamp(point.y, root.rect.yMin + halfHeight, root.rect.yMax - halfHeight));
+            track.GetWorldCorners(panelCorners);
+            var min = RectTransformUtility.WorldToScreenPoint(null, panelCorners[0]);
+            var max = RectTransformUtility.WorldToScreenPoint(null, panelCorners[2]);
+            if (entry.Badge != null)
+            {
+                entry.Badge.GetWorldCorners(panelCorners);
+                min = Vector2.Min(min, RectTransformUtility.WorldToScreenPoint(null, panelCorners[0]));
+                max = Vector2.Max(max, RectTransformUtility.WorldToScreenPoint(null, panelCorners[2]));
+            }
+            track.gameObject.SetActive(!panel.Overlaps(Rect.MinMaxRect(min.x, min.y, max.x, max.y)));
             entry.Bar.Set(actor.Current, actor.Max);
         }
     }
