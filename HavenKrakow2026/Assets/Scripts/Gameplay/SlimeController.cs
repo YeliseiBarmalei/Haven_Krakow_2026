@@ -1,0 +1,339 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+[RequireComponent(typeof(Rigidbody2D), typeof(CircleCollider2D))]
+[RequireComponent(typeof(SpriteRenderer))]
+public sealed class SlimeController : MonoBehaviour
+{
+    private static readonly Color[] AimColors =
+    {
+        new Color32(94, 231, 138, 255),
+        new Color32(255, 168, 67, 255),
+        new Color32(255, 91, 91, 255)
+    };
+
+    [SerializeField, Min(.1f)] private float dragLimit = 2.5f;
+    [SerializeField, Min(.1f)] private float launchSpeed = 16f;
+    [SerializeField, Min(0f)] private float stopSpeed = .25f;
+    [SerializeField, Min(0f)] private float growthPerPiece = .17f;
+    [SerializeField] private Transform aimShaft;
+    [SerializeField] private Transform aimHead;
+    [SerializeField, Min(1)] private int maxHealth = 3;
+    [SerializeField, Min(0.1f)] private float hitCooldown = 1f;
+    [SerializeField] private Color flightTint = new Color(.45f, .85f, 1f);
+    [SerializeField] private Sprite idleSprite;
+    [SerializeField] private Sprite[] idleFrames;
+    [SerializeField, Min(1f)] private float idleFramesPerSecond = 8f;
+    [SerializeField] private Sprite flightSprite;
+    [SerializeField] private AudioClip slideSound;
+    [SerializeField] private AudioClip damageSound;
+
+    private Rigidbody2D body;
+    private CircleCollider2D shape;
+    private Camera view;
+    private Vector2 dragStart;
+    private Vector2 shaftSize;
+    private SpriteRenderer aimHeadVisual;
+    private SpriteRenderer stopMarker;
+    private readonly SpriteRenderer[] powerTicks = new SpriteRenderer[9];
+    private readonly RaycastHit2D[] stopHits = new RaycastHit2D[16];
+    private readonly ContactFilter2D stopFilter = new ContactFilter2D { useTriggers = false };
+    private Vector2 incomingVelocity;
+    private Vector3 startingScale;
+    private bool aiming;
+    private bool launched;
+    private SpriteRenderer visual;
+    private Color restingTint;
+    private float nextHitTime;
+    private int sizeUpgrades;
+    private float idleTime;
+    private float damageFlashUntil;
+
+    public Vector2 Position => body.position;
+    public float Radius => shape.radius * transform.lossyScale.x;
+    public int Pieces { get; private set; }
+    public int Health { get; private set; }
+    public bool IsInFlight => launched;
+    public int MaxHealth => maxHealth;
+    public bool CanLaunch { get; set; } = true;
+    public event System.Action PieceCollected;
+    public event System.Action HealthChanged;
+
+    private void Awake()
+    {
+        body = GetComponent<Rigidbody2D>();
+        shape = GetComponent<CircleCollider2D>();
+        visual = GetComponent<SpriteRenderer>();
+        restingTint = visual.color;
+        Health = maxHealth;
+        startingScale = transform.localScale;
+        view = Camera.main;
+        var shaftVisual = aimShaft.GetComponent<SpriteRenderer>();
+        shaftSize = shaftVisual.sprite.bounds.size;
+        aimHeadVisual = aimHead.GetComponent<SpriteRenderer>();
+        stopMarker = new GameObject("Estimated Stop").AddComponent<SpriteRenderer>();
+        stopMarker.transform.SetParent(transform, false);
+        stopMarker.sprite = shaftVisual.sprite;
+        stopMarker.sharedMaterial = shaftVisual.sharedMaterial;
+        stopMarker.sortingLayerID = shaftVisual.sortingLayerID;
+        stopMarker.sortingOrder = shaftVisual.sortingOrder + 1;
+        shaftVisual.color = new Color32(24, 33, 46, 210);
+        for (var i = 0; i < powerTicks.Length; i++)
+        {
+            var tick = new GameObject($"Power Tick {i + 1}").AddComponent<SpriteRenderer>();
+            tick.transform.SetParent(aimShaft, false);
+            tick.sprite = shaftVisual.sprite;
+            tick.sharedMaterial = shaftVisual.sharedMaterial;
+            tick.sortingLayerID = shaftVisual.sortingLayerID;
+            tick.sortingOrder = shaftVisual.sortingOrder + 1;
+            tick.color = AimColors[i / 3];
+            powerTicks[i] = tick;
+        }
+        HideAim();
+    }
+
+    public void CollectPiece()
+    {
+        Pieces++;
+        PieceCollected?.Invoke();
+    }
+
+    public bool CanUpgradeSize => sizeUpgrades < 6;
+    public float SizeUpgradePercent => growthPerPiece * 100f;
+
+    public void UpgradeSize()
+    {
+        if (!CanUpgradeSize)
+            return;
+
+        transform.localScale = startingScale * (1f + ++sizeUpgrades * growthPerPiece);
+    }
+
+    public void UpgradeHealth()
+    {
+        maxHealth++;
+        Health++;
+        HealthChanged?.Invoke();
+    }
+
+    public void StopLaunch()
+    {
+        body.linearVelocity = Vector2.zero;
+        launched = false;
+        visual.color = restingTint;
+        idleTime = 0f;
+        UpdateIdleSprite();
+        visual.flipX = false;
+    }
+
+    public void KeepInside(Bounds bounds)
+    {
+        var position = Position;
+        body.position = new Vector2(
+            Mathf.Clamp(position.x, bounds.min.x + Radius, bounds.max.x - Radius),
+            Mathf.Clamp(position.y, bounds.min.y + Radius, bounds.max.y - Radius));
+    }
+
+    private void Update()
+    {
+        if (!launched)
+        {
+            idleTime += Time.deltaTime;
+            UpdateIdleSprite();
+            visual.color = Time.time < damageFlashUntil ? new Color(1f, .42f, .45f) : restingTint;
+        }
+
+        if (!CanLaunch || FadeTransition.IsBusy || Time.timeScale == 0 || !Application.isFocused ||
+            view == null || Mouse.current is not { } mouse || Keyboard.current?.escapeKey.wasPressedThisFrame == true)
+        {
+            HideAim();
+            return;
+        }
+
+        var cursor = mouse.position.ReadValue();
+        if (mouse.leftButton.wasPressedThisFrame)
+        {
+            aiming = true;
+            dragStart = cursor;
+        }
+
+        if (!aiming)
+            return;
+
+        var worldUnitsPerPixel = 2f * view.orthographicSize / view.pixelHeight;
+        var pull = Vector2.ClampMagnitude((cursor - dragStart) * worldUnitsPerPixel, dragLimit);
+        if (mouse.leftButton.wasReleasedThisFrame)
+        {
+            if (pull.sqrMagnitude > .01f)
+            {
+                body.linearVelocity = pull * (launchSpeed / dragLimit);
+                launched = true;
+                GameAudio.Play(slideSound, .68f);
+                visual.color = flightTint;
+                visual.sprite = flightSprite;
+                visual.flipX = pull.x < 0f;
+            }
+            HideAim();
+            return;
+        }
+
+        if (!mouse.leftButton.isPressed)
+        {
+            HideAim();
+            return;
+        }
+
+        ShowAim(pull);
+    }
+
+    private void UpdateIdleSprite()
+    {
+        if (idleFrames == null || idleFrames.Length < 2)
+        {
+            visual.sprite = idleSprite;
+            return;
+        }
+
+        var last = idleFrames.Length - 1;
+        var cycleLength = last * 2;
+        idleTime %= cycleLength / idleFramesPerSecond;
+        var frame = Mathf.FloorToInt(idleTime * idleFramesPerSecond);
+        visual.sprite = idleFrames[Mathf.Min(frame, cycleLength - frame)];
+    }
+
+    private void FixedUpdate()
+    {
+        incomingVelocity = body.linearVelocity;
+        if (launched && incomingVelocity.sqrMagnitude <= stopSpeed * stopSpeed)
+            StopLaunch();
+        else if (launched && Mathf.Abs(incomingVelocity.x) > stopSpeed)
+            visual.flipX = incomingVelocity.x < 0f;
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        var hitEnemy = CheckEnemyContact(collision);
+        if (!CanLaunch || !launched || !collision.collider.TryGetComponent<ActorHealth>(out var actor))
+            return;
+
+        if (collision.contactCount > 0)
+            SlidePastActor(collision.GetContact(0).normal);
+        if (!hitEnemy)
+            actor.TakeHit();
+    }
+
+    private void SlidePastActor(Vector2 normal)
+    {
+        var speed = incomingVelocity.magnitude;
+        if (speed <= stopSpeed || Vector2.Dot(incomingVelocity, normal) >= 0f)
+            return;
+
+        var tangent = Vector2.Perpendicular(normal);
+        var slideSpeed = Vector2.Dot(incomingVelocity, tangent);
+        var direction = slideSpeed < 0f ? -1f : 1f;
+        body.linearVelocity = tangent * (direction * Mathf.Max(Mathf.Abs(slideSpeed), speed * .55f)) +
+            normal * (speed * .12f);
+    }
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        CheckEnemyContact(collision);
+    }
+
+    private bool CheckEnemyContact(Collision2D collision)
+    {
+        if (!collision.collider.TryGetComponent<Shooter>(out _))
+            return false;
+
+        if (CanLaunch && !launched && Time.time >= nextHitTime)
+        {
+            nextHitTime = Time.time + hitCooldown;
+            TakeHit();
+        }
+
+        return true;
+    }
+
+    public void TakeHit()
+    {
+        if (!CanLaunch || launched || Health <= 0)
+            return;
+
+        Health--;
+        GameAudio.Play(damageSound, .85f);
+        damageFlashUntil = Time.time + .16f;
+        visual.color = new Color(1f, .42f, .45f);
+        HealthChanged?.Invoke();
+    }
+
+    public bool Heal()
+    {
+        if (Health <= 0 || Health >= MaxHealth)
+            return false;
+
+        Health++;
+        HealthChanged?.Invoke();
+        return true;
+    }
+
+    private void ShowAim(Vector2 pull)
+    {
+        var length = pull.magnitude;
+        var direction = pull.normalized;
+        var start = (Vector2)transform.position + direction * Radius;
+        var rotation = Quaternion.Euler(0, 0, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+        var scale = transform.lossyScale.x;
+        if (length <= .1f)
+        {
+            aimShaft.gameObject.SetActive(false);
+            aimHead.gameObject.SetActive(false);
+            stopMarker.enabled = false;
+            return;
+        }
+
+        aimShaft.SetPositionAndRotation(start + pull * .5f, rotation);
+        aimShaft.localScale = new Vector3(length / (shaftSize.x * scale), .075f / (shaftSize.y * scale), 1f);
+        var tickLength = dragLimit / powerTicks.Length;
+        for (var i = 0; i < powerTicks.Length; i++)
+        {
+            var offset = i * tickLength;
+            var width = Mathf.Clamp(length - offset, 0f, tickLength * .76f);
+            var tick = powerTicks[i];
+            tick.enabled = width > 0f;
+            tick.transform.localPosition = new Vector3(((offset + width * .5f) / length - .5f) * shaftSize.x, 0f, 0f);
+            tick.transform.localScale = new Vector3(width / length, 1.65f, 1f);
+        }
+
+        aimHeadVisual.color = AimColors[Mathf.Min((int)(length / dragLimit * AimColors.Length), AimColors.Length - 1)];
+        aimHead.SetPositionAndRotation(start + pull, rotation * Quaternion.Euler(0, 0, -90));
+        aimHead.localScale = new Vector3(.28f / scale, .29f / scale, 1f);
+        aimShaft.gameObject.SetActive(true);
+        aimHead.gameObject.SetActive(true);
+        ShowStopMarker(pull);
+    }
+
+    private void ShowStopMarker(Vector2 pull)
+    {
+        // Damping sets the stopping distance on an unobstructed slide.
+        var speed = pull.magnitude * launchSpeed / dragLimit;
+        var distance = Mathf.Max(0f, speed - stopSpeed) / Mathf.Max(.01f, body.linearDamping);
+        var direction = pull.normalized;
+        var count = shape.Cast(direction, stopFilter, stopHits, distance);
+        for (var i = 0; i < count; i++)
+            distance = Mathf.Min(distance, stopHits[i].distance);
+
+        stopMarker.transform.SetPositionAndRotation((Vector2)transform.position + direction * distance, Quaternion.Euler(0, 0, 45f));
+        stopMarker.transform.localScale = new Vector3(.12f / (shaftSize.x * transform.lossyScale.x),
+            .12f / (shaftSize.y * transform.lossyScale.y), 1f);
+        stopMarker.color = new Color(aimHeadVisual.color.r, aimHeadVisual.color.g, aimHeadVisual.color.b, .7f);
+        stopMarker.enabled = distance > Radius;
+    }
+
+    private void HideAim()
+    {
+        aiming = false;
+        aimShaft.gameObject.SetActive(false);
+        aimHead.gameObject.SetActive(false);
+        stopMarker.enabled = false;
+    }
+}

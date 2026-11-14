@@ -9,7 +9,13 @@ EditorBuildSettings:
     path: Assets/Scenes/MainMenu.unity
     guid: 9c46e7249296f5941b713838c935bc9f
   - enabled: 1
-    path: Assets/Scenes/Sandbox.unity
+    path: Assets/Scenes/EndlessArena.unity
     guid: 1541691bc2aaf474eba16b305cf925dd
+  - enabled: 1
+    path: Assets/Scenes/Levels/Level02.unity
+    guid: cd0afed45379bd7e8d03838b5fc676b3
+  - enabled: 1
+    path: Assets/Scenes/Levels/Level03.unity
+    guid: d553659caf053f3e64b2d0c4ca0191a4
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

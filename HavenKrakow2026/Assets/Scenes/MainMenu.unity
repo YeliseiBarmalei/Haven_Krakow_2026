@@ -148,7 +148,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd352a547018d2745b818393a9554a2b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenu
-  sandboxScene: Sandbox
+  arenaScene: EndlessArena
+  volumeFontSource: {fileID: 970263249}
+  uiClick: {fileID: 8300000, guid: ac0c7648253d45eda9667f771f1a9f25, type: 3}
 --- !u!4 &42225635
 Transform:
   m_ObjectHideFlags: 0
@@ -278,7 +280,7 @@ Camera:
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
-  m_TargetEye: 0
+  m_TargetEye: 3
   m_HDR: 1
   m_AllowMSAA: 0
   m_AllowDynamicResolution: 0
@@ -977,7 +979,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u0418\u0433\u0440\u0430\u0442\u044C"
+  m_Text: Play
 --- !u!222 &1754429679
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1056,7 +1058,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u0412\u044B\u0445\u043E\u0434"
+  m_Text: Quit
 --- !u!222 &1933386720
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1175,5 +1177,5 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 2038842992}
-  - {fileID: 1320074275}
   - {fileID: 42225635}
+  - {fileID: 1320074275}
