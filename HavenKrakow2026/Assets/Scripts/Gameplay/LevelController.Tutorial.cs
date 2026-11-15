@@ -3,7 +3,7 @@ using UnityEngine.UI;
 
 public sealed partial class LevelController
 {
-    private enum TutorialStep { None, Launch, Reflect, SlowMotion, Swap, Shield, Collect, Upgrade }
+    private enum TutorialStep { None, Launch, Reflect, SlowMotion, Swap, Shield, Collect, Upgrade, Lightning, Ram }
 
     [SerializeField] private Text tutorialNotice;
     [SerializeField] private string tutorialExitScene = "Level01";
@@ -15,6 +15,7 @@ public sealed partial class LevelController
     private bool tutorialShieldReady;
     private bool tutorialSwapped;
     private float tutorialWait;
+    private LightningHazard tutorialLightning;
 
     private void SpawnTutorialShooter()
     {
@@ -39,12 +40,15 @@ public sealed partial class LevelController
         ShowTutorialPrompt(step switch
         {
             TutorialStep.Launch => "Drag with left mouse and release to launch.",
-            TutorialStep.Reflect => "Intercept the bullet aimed at Grandma while sliding.",
+            TutorialStep.Reflect => "Slide into the incoming bullet and send it back into the shooter.",
             TutorialStep.SlowMotion => "Press Space, then try moving while the bullets slow down.",
-            TutorialStep.Swap => "Press E when a bullet is on the arena to swap places with it.",
+            TutorialStep.Swap => "Press Q when a bullet is on the arena to swap places with it.",
             TutorialStep.Shield => "Watch the bullet flying toward Grandma.",
-            TutorialStep.Collect => $"Collect {UpgradeCost} slime pieces after they land.",
-            _ => "Choose your first upgrade."
+            TutorialStep.Collect => $"Collect {UpgradeCost} slime pieces after they land. Each upgrade costs one more piece.",
+            TutorialStep.Upgrade => "Choose your first upgrade.",
+            TutorialStep.Lightning => "Launch out of the warning circle before lightning strikes.",
+            TutorialStep.Ram => "Pull the launch arrow to its limit, then ram the TNT runner.",
+            _ => string.Empty
         });
 
         if (step == TutorialStep.Collect)
@@ -64,7 +68,7 @@ public sealed partial class LevelController
 
     private void ShowTutorialPrompt(string instruction)
     {
-        tutorialNotice.text = $"Practice {(int)tutorialStep}/7\n{instruction}";
+        tutorialNotice.text = $"Practice {(int)tutorialStep}/{(int)TutorialStep.Ram}\n{instruction}";
     }
 
     private void UpdateTutorial()
@@ -87,7 +91,7 @@ public sealed partial class LevelController
                 else if (tutorialUsedSlowMotion && slowRemaining <= 0f)
                 {
                     slowRecharge = 0f;
-                    hud.SetSlowMotion(0f, 0f, balance.slowDuration, balance.slowCooldown);
+                    hud.SetSlowMotion(0f, 0f, balance.slowDuration, SlowCooldown);
                     BeginTutorialStep(TutorialStep.Swap);
                 }
                 break;
@@ -102,7 +106,7 @@ public sealed partial class LevelController
                 if (tutorialSwapped && (tutorialWait -= Time.deltaTime) <= 0f)
                 {
                     swapRecharge = 0f;
-                    hud.SetSwap(0f, balance.swapCooldown, false);
+                    hud.SetSwap(0f, SwapCooldown, false);
                     BeginTutorialStep(TutorialStep.Shield);
                 }
                 break;
@@ -119,6 +123,7 @@ public sealed partial class LevelController
                 {
                     shieldRemaining = shieldRecharge = 0f;
                     RefreshShield();
+                    tutorialShooter.gameObject.SetActive(false);
                     BeginTutorialStep(TutorialStep.Collect);
                 }
                 break;
@@ -135,6 +140,17 @@ public sealed partial class LevelController
             return;
 
         var step = Time.fixedDeltaTime * ArenaSpeed;
+        if (tutorialStep == TutorialStep.Lightning)
+        {
+            TickTutorialLightning(step);
+            return;
+        }
+        if (tutorialStep == TutorialStep.Ram)
+        {
+            TickTutorialRam(step);
+            return;
+        }
+
         if (tutorialShooter != null && tutorialShooter.isActiveAndEnabled)
             tutorialShooter.TickPracticeAnimation(step);
 
@@ -156,16 +172,55 @@ public sealed partial class LevelController
             if (Vector2.Distance(shot.Position, center) <= radius + .25f)
             {
                 shot.TeleportTo(center + (shot.Position - center).normalized * (radius + .005f));
+                shieldRecharge = 0f;
                 tutorialShieldReady = true;
                 slime.CanLaunch = false;
                 slime.StopLaunch();
-                ShowTutorialPrompt("Press Q now to reflect the bullet.");
+                ShowTutorialPrompt("Press E now to reflect the bullet.");
                 return;
             }
         }
 
         MoveBullets();
         previousSlimePosition = slime.Position;
+    }
+
+    private void TickTutorialLightning(float step)
+    {
+        if (tutorialLightning == null)
+        {
+            var sky = arenaCamera.ViewportToWorldPoint(new Vector3(.5f, 1f, arenaCamera.nearClipPlane)).y;
+            tutorialLightning = LightningHazard.Spawn(transform, slime.Position, sky, lightningRadius, lightningMaterial);
+        }
+
+        if (!tutorialLightning.Tick(step, slime, balance.lightningSound, balance.lightningSoundVolume, dealDamage: false))
+            return;
+
+        var dodged = !tutorialLightning.HitSlime;
+        Destroy(tutorialLightning.gameObject);
+        tutorialLightning = null;
+        if (dodged)
+            BeginTutorialStep(TutorialStep.Ram);
+        else
+            ShowTutorialPrompt("Try again. Clear the warning circle before the flash.");
+    }
+
+    private void TickTutorialRam(float step)
+    {
+        if (kamikazes.Count == 0)
+            SpawnKamikaze(new Vector2(1f, -.45f));
+
+        var runner = kamikazes[0];
+        if (runner != null && runner.IsActive)
+            runner.Tick(step, dealDamage: false);
+        if (runner != null && runner.IsActive)
+            return;
+
+        kamikazes.Clear();
+        if (waveKamikazeDefeats > 0)
+            CompleteTutorial();
+        else
+            ShowTutorialPrompt("Try again. Pull the arrow all the way back before releasing.");
     }
 
     private void ClearTutorialShots()

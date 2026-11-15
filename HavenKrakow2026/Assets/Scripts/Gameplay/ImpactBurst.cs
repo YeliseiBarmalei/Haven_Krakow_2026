@@ -90,7 +90,7 @@ public sealed class ImpactBurst : MonoBehaviour
         if (cloudSprite == null)
             cloudSprite = MakeSprite(false, cloud: true);
 
-        flash = AddSprite("Fireball Flash", cloudSprite, source);
+        flash = AddSprite("Explosion Flash", cloudSprite, source);
         flash.sortingOrder = ring.sortingOrder + 1;
         flash.color = new Color(1f, .97f, .76f);
         flash.transform.localScale = Vector3.one * .35f;

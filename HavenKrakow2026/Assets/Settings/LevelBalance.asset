@@ -27,3 +27,5 @@ MonoBehaviour:
   shieldColor: {r: 0.25, g: 0.92, b: 0.62, a: 1}
   shieldHitColor: {r: 0.77, g: 1, b: 0.94, a: 1}
   shieldMaterial: {fileID: 0}
+  lightningSound: {fileID: 8300000, guid: 09ab6239c7155954d9d16a8a0bb22d52, type: 3}
+  lightningSoundVolume: 0.25

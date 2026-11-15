@@ -15,7 +15,6 @@ public sealed class SlimeController : MonoBehaviour
     [SerializeField, Min(.1f)] private float dragLimit = 2.5f;
     [SerializeField, Min(.1f)] private float launchSpeed = 16f;
     [SerializeField, Min(0f)] private float stopSpeed = .25f;
-    [SerializeField, Min(0f)] private float growthPerPiece = .17f;
     [SerializeField] private Transform aimShaft;
     [SerializeField] private Transform aimHead;
     [SerializeField, Min(1)] private int maxHealth = 3;
@@ -65,14 +64,12 @@ public sealed class SlimeController : MonoBehaviour
     private readonly RaycastHit2D[] stopHits = new RaycastHit2D[16];
     private readonly ContactFilter2D stopFilter = new ContactFilter2D { useTriggers = false };
     private Vector2 incomingVelocity;
-    private Vector3 startingScale;
     private bool aiming;
     private bool launched;
     private bool fullPowerLaunch;
     private SpriteRenderer visual;
     private Color restingTint;
     private float nextHitTime;
-    private int sizeUpgrades;
     private float idleTime;
     private float damageFlashUntil;
 
@@ -95,7 +92,6 @@ public sealed class SlimeController : MonoBehaviour
         visual = GetComponent<SpriteRenderer>();
         restingTint = visual.color;
         Health = maxHealth;
-        startingScale = transform.localScale;
         view = Camera.main;
         var shaftVisual = aimShaft.GetComponent<SpriteRenderer>();
         shaftSize = shaftVisual.sprite.bounds.size;
@@ -203,7 +199,7 @@ public sealed class SlimeController : MonoBehaviour
             return;
 
         var targetVolume = audible
-            ? slowMotionMovementVolume * Mathf.Lerp(.45f, 1f, Mathf.Clamp01(speed / launchSpeed))
+            ? slowMotionMovementVolume * GameAudio.EffectsVolume * Mathf.Lerp(.45f, 1f, Mathf.Clamp01(speed / launchSpeed))
             : 0f;
         slowMotionMovementSource.volume = Mathf.MoveTowards(
             slowMotionMovementSource.volume, targetVolume, Time.unscaledDeltaTime * 8f);
@@ -250,17 +246,6 @@ public sealed class SlimeController : MonoBehaviour
     {
         if (afterimageRoot != null)
             Destroy(afterimageRoot.gameObject);
-    }
-
-    public bool CanUpgradeSize => sizeUpgrades < 6;
-    public float SizeUpgradePercent => growthPerPiece * 100f;
-
-    public void UpgradeSize()
-    {
-        if (!CanUpgradeSize)
-            return;
-
-        transform.localScale = startingScale * (1f + ++sizeUpgrades * growthPerPiece);
     }
 
     public void UpgradeHealth()

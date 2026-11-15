@@ -14,6 +14,8 @@ public sealed class Shooter : MonoBehaviour
     [SerializeField] private Sprite aimFrame;
     [SerializeField] private Sprite[] shotFrames;
     [SerializeField, Min(.01f)] private float shotFrameDuration = .085f;
+    [SerializeField] private AudioClip shotSound;
+    [SerializeField, Range(0f, 1f)] private float shotVolume = .24f;
     [Header("Knockback")]
     [SerializeField, Min(0f)] private float knockbackMultiplier = 1f;
     [SerializeField, Min(.1f)] private float maxKnockbackSpeed = 3f;
@@ -61,7 +63,8 @@ public sealed class Shooter : MonoBehaviour
     public bool CanBeHit => isActiveAndEnabled && !approaching;
     public ActorHealth Health => health;
     public float WallClearance => health.Radius + .12f;
-    public Vector2 VisualExtents => GetComponent<SpriteRenderer>().bounds.extents;
+    public Bounds VisualBounds => visual.bounds;
+    public Vector2 VisualExtents => VisualBounds.extents;
 
     private void Awake()
     {
@@ -108,6 +111,7 @@ public sealed class Shooter : MonoBehaviour
         body.simulated = false;
         transform.position = entrance;
         FaceHorizontally(target.x - entrance.x);
+        UpdateWalkAnimation(0f);
     }
 
     public void Tick(ActorHealth target, LevelController level)
@@ -123,9 +127,6 @@ public sealed class Shooter : MonoBehaviour
         var step = Time.fixedDeltaTime * arenaSpeed;
         UpdateShotAnimation(step);
         UpdateWalkAnimation(step);
-        if (!HasShots)
-            return;
-
         if (approaching)
         {
             var position = Vector2.MoveTowards(transform.position, approachTarget, approachSpeed * step);
@@ -138,6 +139,9 @@ public sealed class Shooter : MonoBehaviour
             }
             return;
         }
+
+        if (!HasShots)
+            return;
 
         if (postShotTime > 0f)
         {
@@ -250,6 +254,7 @@ public sealed class Shooter : MonoBehaviour
     private void FireShot(LevelController level, Vector2 muzzle, Vector2 direction)
     {
         level.Fire(muzzle, direction * bulletSpeed);
+        GameAudio.Play(shotSound, shotVolume);
         if (shotFrames != null && shotFrames.Length > 0)
         {
             shotAnimationRemaining = shotFrameDuration * shotFrames.Length;

@@ -149,7 +149,6 @@ MonoBehaviour:
   dragLimit: 2.5
   launchSpeed: 16
   stopSpeed: 0.25
-  growthPerPiece: 0.17
   aimShaft: {fileID: 111}
   aimHead: {fileID: 121}
   maxHealth: 3

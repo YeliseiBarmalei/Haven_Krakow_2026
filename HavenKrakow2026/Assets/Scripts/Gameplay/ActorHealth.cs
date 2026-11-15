@@ -5,12 +5,14 @@ public sealed class ActorHealth : MonoBehaviour
 {
     [SerializeField, Min(1)] private int maxHealth = 3;
     [SerializeField] private Color injuredTint = new Color(1f, .52f, .55f);
+    [SerializeField, Min(0f)] private float hitFlashDuration;
     [SerializeField] private bool hideOnDeath;
     [SerializeField] private AudioClip damageSound;
 
     private Collider2D shape;
     private SpriteRenderer visual;
     private Color healthyTint;
+    private float hitFlashRemaining;
 
     public float Current { get; private set; }
     public int Max => maxHealth;
@@ -25,6 +27,16 @@ public sealed class ActorHealth : MonoBehaviour
         visual = GetComponent<SpriteRenderer>();
         healthyTint = visual.color;
         Current = maxHealth;
+    }
+
+    private void Update()
+    {
+        if (hitFlashRemaining <= 0f)
+            return;
+
+        hitFlashRemaining = Mathf.Max(0f, hitFlashRemaining - Time.deltaTime);
+        if (hitFlashRemaining == 0f)
+            UpdateTint();
     }
 
     public void UpgradeHealth()
@@ -51,6 +63,7 @@ public sealed class ActorHealth : MonoBehaviour
         var tint = hideOnDeath ? new Color(1f, .55f, .21f) : new Color(1f, .42f, .59f);
         ImpactBurst.Spawn(visual, Center, direction, tint, defeated);
         GameAudio.Play(damageSound, .85f);
+        hitFlashRemaining = defeated ? 0f : hitFlashDuration;
         UpdateTint();
         if (defeated)
             gameObject.SetActive(false);
@@ -59,7 +72,9 @@ public sealed class ActorHealth : MonoBehaviour
 
     private void UpdateTint()
     {
-        visual.color = Color.Lerp(healthyTint, injuredTint, 1f - Current / Max);
+        visual.color = hitFlashRemaining > 0f
+            ? new Color(1f, .24f, .24f, healthyTint.a)
+            : Color.Lerp(healthyTint, injuredTint, 1f - Current / Max);
     }
 
     public bool Heal()

@@ -5,6 +5,9 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Slider))]
 public sealed class VolumeControl : MonoBehaviour, IPointerUpHandler
 {
+    private enum Channel { Master, Music, Effects }
+
+    [SerializeField] private Channel channel;
     [SerializeField] private Text label;
     [SerializeField] private AudioClip previewClip;
 
@@ -17,7 +20,12 @@ public sealed class VolumeControl : MonoBehaviour, IPointerUpHandler
 
     private void OnEnable()
     {
-        slider.SetValueWithoutNotify(GameAudio.Volume);
+        slider.SetValueWithoutNotify(channel switch
+        {
+            Channel.Music => GameAudio.MusicVolume,
+            Channel.Effects => GameAudio.EffectsVolume,
+            _ => GameAudio.Volume
+        });
         UpdateLabel(slider.value);
         slider.onValueChanged.AddListener(SetVolume);
     }
@@ -34,12 +42,23 @@ public sealed class VolumeControl : MonoBehaviour, IPointerUpHandler
 
     private void SetVolume(float value)
     {
-        GameAudio.SetVolume(value);
+        switch (channel)
+        {
+            case Channel.Music: GameAudio.SetMusicVolume(value); break;
+            case Channel.Effects: GameAudio.SetEffectsVolume(value); break;
+            default: GameAudio.SetVolume(value); break;
+        }
         UpdateLabel(value);
     }
 
     private void UpdateLabel(float value)
     {
-        label.text = $"Volume  {Mathf.RoundToInt(value * 100f)}%";
+        var title = channel switch
+        {
+            Channel.Music => "Music",
+            Channel.Effects => "Sound Effects",
+            _ => "Master Volume"
+        };
+        label.text = $"{title}  {Mathf.RoundToInt(value * 100f)}%";
     }
 }

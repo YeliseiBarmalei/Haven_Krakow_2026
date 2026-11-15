@@ -1,22 +1,10 @@
 fileFormatVersion: 2
-guid: 8d842d19d1af1af4bbd89c426f52c18b
+guid: 0efad45181fdcc945a7cf5028c2978ec
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 6312315070412584015
-    second: Slime_SpriteSheet_3
-  - first:
-      213: 2318792017877170028
-    second: Slime_SpriteSheet_4
-  - first:
-      213: 8486667389347374098
-    second: Slime_SpriteSheet_5
-  - first:
-      213: 2108354968622866212
-    second: Slime_SpriteSheet_9
-  - first:
-      213: 1817245549237434385
-    second: Slime_SpriteSheet_10
+      213: -2346302928887187388
+    second: bullet_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,7 +34,7 @@ TextureImporter:
   cubemapConvolution: 0
   seamlessCubemap: 0
   textureFormat: 1
-  maxTextureSize: 8192
+  maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
     filterMode: 1
@@ -63,9 +51,9 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 1650
+  spritePixelsToUnits: 3810
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
-  spriteGenerateFallbackPhysicsShape: 0
+  spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
   spriteTessellationMethod: 0
@@ -86,7 +74,7 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 8192
+    maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -99,7 +87,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
     buildTarget: Standalone
-    maxTextureSize: 8192
+    maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -112,7 +100,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
     buildTarget: Android
-    maxTextureSize: 8192
+    maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -125,7 +113,7 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
     buildTarget: WebGL
-    maxTextureSize: 8192
+    maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
@@ -140,111 +128,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Slime_SpriteSheet_3
+      name: bullet_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 2480
-        width: 1748
-        height: 2480
-      alignment: 9
-      pivot: {x: 0.4617, y: 0.306}
+        x: 142
+        y: 509
+        width: 938
+        height: 797
+      alignment: 0
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f44794acc19d99750800000000000000
-      internalID: 6312315070412584015
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slime_SpriteSheet_4
-      rect:
-        serializedVersion: 2
-        x: 1748
-        y: 2480
-        width: 1748
-        height: 2480
-      alignment: 9
-      pivot: {x: 0.4617, y: 0.306}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: c6774950e010e2020800000000000000
-      internalID: 2318792017877170028
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slime_SpriteSheet_5
-      rect:
-        serializedVersion: 2
-        x: 3496
-        y: 2480
-        width: 1748
-        height: 2480
-      alignment: 9
-      pivot: {x: 0.4617, y: 0.306}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 21421fcb603b6c570800000000000000
-      internalID: 8486667389347374098
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slime_SpriteSheet_9
-      rect:
-        serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1748
-        height: 2480
-      alignment: 9
-      pivot: {x: 0.4617, y: 0.306}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 42f12356ca1624d10800000000000000
-      internalID: 2108354968622866212
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Slime_SpriteSheet_10
-      rect:
-        serializedVersion: 2
-        x: 1748
-        y: 0
-        width: 1748
-        height: 2480
-      alignment: 9
-      pivot: {x: 0.4617, y: 0.306}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 118f4f7e237283910800000000000000
-      internalID: 1817245549237434385
+      spriteID: 448783cdae1407fd0800000000000000
+      internalID: -2346302928887187388
       vertices: []
       indices: 
       edges: []
@@ -263,11 +163,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Slime_SpriteSheet_3: 6312315070412584015
-      Slime_SpriteSheet_4: 2318792017877170028
-      Slime_SpriteSheet_5: 8486667389347374098
-      Slime_SpriteSheet_9: 2108354968622866212
-      Slime_SpriteSheet_10: 1817245549237434385
+      bullet_0: -2346302928887187388
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

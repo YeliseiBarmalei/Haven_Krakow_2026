@@ -85,15 +85,15 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 3
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 7120000000000000001, guid: 0f4d0ac9f4642214bba69bc4be4c6337, type: 3}
-  m_Color: {r: 1, g: 0.38, b: 0.25, a: 1}
+  m_Sprite: {fileID: 6482798133326635101, guid: 20dc3d64bbd3448fa195da647b1a4528, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
   m_Size: {x: 11.894038, y: 19.63}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
 --- !u!61 &103
@@ -130,17 +130,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: -0.028772816, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 11.894038, y: 19.63}
+    pivot: {x: 0.545, y: 0.49}
+    oldSize: {x: 0.76, y: 1.0782609}
     newSize: {x: 11.894038, y: 19.63}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.72, y: 0.72}
+  m_Size: {x: 0.48981777, y: 0.72}
   m_EdgeRadius: 0
 --- !u!114 &105
 MonoBehaviour:
@@ -155,12 +155,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Kamikaze
   startingSpeed: 0.9
-  acceleration: 1.25
-  maximumSpeed: 5
-  explosionDamage: 2
+  acceleration: 1.35
+  maximumSpeed: 3
+  walkFrames:
+  - {fileID: 6482798133326635101, guid: 20dc3d64bbd3448fa195da647b1a4528, type: 3}
+  - {fileID: 1711204012462031718, guid: 20dc3d64bbd3448fa195da647b1a4528, type: 3}
+  - {fileID: 2941060625982372204, guid: 20dc3d64bbd3448fa195da647b1a4528, type: 3}
+  - {fileID: -6823807515843812848, guid: 20dc3d64bbd3448fa195da647b1a4528, type: 3}
+  walkFramesPerSecond: 8
+  explosionDamage: 1
   explosionVisualScale: 1.8
-  explosionSound: {fileID: 8300000, guid: 60cf6e77e256214d3a2c733f0967f165, type: 3}
-  explosionVolume: 0.55
+  explosionSound: {fileID: 8300000, guid: 2cec9007c9f34a1d83ea143571484f63, type: 3}
+  explosionVolume: 0.3
+  runSound: {fileID: 8300000, guid: 9b054c3e7dd644dd9085d4f203a43beb, type: 3}
+  runVolume: 0.12
 --- !u!50 &106
 Rigidbody2D:
   serializedVersion: 5
@@ -277,6 +285,6 @@ SpriteRenderer:
   m_Size: {x: 11.894038, y: 19.63}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []

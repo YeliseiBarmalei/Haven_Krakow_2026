@@ -83,7 +83,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 7
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 53ea7d69700faf9a304d61b97136c5a0, type: 3}
+  m_Sprite: {fileID: -2346302928887187388, guid: 0efad45181fdcc945a7cf5028c2978ec, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -142,5 +142,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bd905a8970e34b40a930c9b24eb0768, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Projectile
-  deflectedTint: {r: 0.45, g: 1, b: 0.72, a: 1}
+  deflectedTint: {r: 0.45156989, g: 0.66378736, b: 0.98490566, a: 1}
   returnSpeedPerSlimeSpeed: 0.6

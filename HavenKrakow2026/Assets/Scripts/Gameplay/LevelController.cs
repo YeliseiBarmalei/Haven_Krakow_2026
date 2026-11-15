@@ -21,10 +21,10 @@ public sealed partial class LevelController : MonoBehaviour
         [Tooltip("Normalized entry positions along the arena edges.")]
         public Vector2[] kamikazes = System.Array.Empty<Vector2>();
         public Reinforcement[] reinforcements = System.Array.Empty<Reinforcement>();
-        [Min(0f), Tooltip("Seconds between fireballs. Lower values spawn them more often. Zero disables the event.")]
-        public float fireballInterval;
-        [Min(0f), Tooltip("Seconds from wave start until the first fireball appears.")]
-        public float fireballStartDelay;
+        [Min(0f), Tooltip("Seconds between lightning strikes. Lower values make strikes more frequent. Zero disables the event.")]
+        public float lightningInterval;
+        [Min(0f), Tooltip("Seconds from wave start until the first lightning warning appears.")]
+        public float lightningStartDelay;
     }
 
     [System.Serializable]
@@ -50,9 +50,9 @@ public sealed partial class LevelController : MonoBehaviour
     [SerializeField] private Kamikaze kamikazePrefab;
     [SerializeField] private Wave[] waves;
     [SerializeField] private LevelBalance balance;
-    [SerializeField] private Material fireballMaterial;
-    [SerializeField, Min(.1f)] private float fireballRadius = 1.5f;
-    [SerializeField, Min(.6f)] private float fireballAimSpread = 2.8f;
+    [SerializeField] private Material lightningMaterial;
+    [SerializeField, Min(.1f)] private float lightningRadius = 1.5f;
+    [SerializeField, Min(.6f)] private float lightningAimSpread = 2.8f;
     [SerializeField] private string mainMenuScene = "MainMenu";
     [SerializeField] private string nextLevelScene;
     [SerializeField] private SlimePiece piecePrefab;
@@ -80,12 +80,20 @@ public sealed partial class LevelController : MonoBehaviour
     private int wave = 1;
     private float waveDelay = 2f;
     private float pieceTimer;
+    private GrandmaAnimation grandmaAnimation;
     private float healingDropTimer = 18f;
     private SlimePiece healingDrop;
     private float fittedAspect;
     private int slimeLevel = 1;
     private int spentPieces;
-    private int reflectedDamage = 1;
+    private float reflectedDamage = 1f;
+    private const int CooldownUpgradeLimit = 2;
+    private const float SlowAndSwapReduction = 1f;
+    private const float ParryMissReduction = .5f;
+    private int cooldownUpgrades;
+    private float SlowCooldown => Mathf.Max(0f, balance.slowCooldown - cooldownUpgrades * SlowAndSwapReduction);
+    private float SwapCooldown => Mathf.Max(0f, balance.swapCooldown - cooldownUpgrades * SlowAndSwapReduction);
+    private float ShieldMissCooldown => Mathf.Max(0f, balance.shieldMissCooldown - cooldownUpgrades * ParryMissReduction);
     private float slowRemaining;
     private float slowRecharge;
     private float swapRecharge;
@@ -102,8 +110,8 @@ public sealed partial class LevelController : MonoBehaviour
     private int enemiesDefeated;
     private int UpgradeCost => balance.startingUpgradeCost + slimeLevel - 1;
     private string VictoryScene => string.IsNullOrEmpty(nextLevelScene) ? mainMenuScene : nextLevelScene;
-    private float fireballTimer;
-    private readonly List<FireballHazard> fireballs = new();
+    private float lightningTimer;
+    private readonly List<LightningHazard> lightningStrikes = new();
     private readonly List<Kamikaze> kamikazes = new();
     private int nextReinforcement;
     private int waveKamikazeDefeats;
@@ -121,6 +129,7 @@ public sealed partial class LevelController : MonoBehaviour
         slime.HealthChanged += OnSlimeHealthChanged;
         grandma.Changed += OnGrandmaHealthChanged;
         pieceTimer = balance.pieceInterval;
+        grandmaAnimation = grandma.GetComponent<GrandmaAnimation>();
         Canvas.ForceUpdateCanvases();
         if (tutorialNotice != null)
         {
@@ -164,7 +173,7 @@ public sealed partial class LevelController : MonoBehaviour
     private void OpenUpgradeMenu()
     {
         GameAudio.Play(levelUpSound, .85f);
-        upgradeMenu.Open(slimeLevel + 1, slime.CanUpgradeSize, slime.SizeUpgradePercent, ChooseUpgrade);
+        upgradeMenu.Open(slimeLevel + 1, cooldownUpgrades, CooldownUpgradeLimit, ChooseUpgrade);
     }
 
     private void UpdateSlowMotion()
@@ -176,14 +185,14 @@ public sealed partial class LevelController : MonoBehaviour
             Keyboard.current?.spaceKey.wasPressedThisFrame == true)
         {
             slowRemaining = balance.slowDuration;
-            slowRecharge = balance.slowCooldown;
+            slowRecharge = SlowCooldown;
             GameAudio.PlayTransition(slowMotionSound);
         }
 
         if (wasSlow != (slowRemaining > 0f))
             GameAudio.SetPlaybackSpeed(ArenaSpeed);
 
-        hud.SetSlowMotion(slowRemaining, slowRecharge, balance.slowDuration, balance.slowCooldown);
+        hud.SetSlowMotion(slowRemaining, slowRecharge, balance.slowDuration, SlowCooldown);
         slime.SetSlowMotionAfterimages(slowRemaining > 0f);
     }
 
@@ -196,7 +205,7 @@ public sealed partial class LevelController : MonoBehaviour
     {
         swapRecharge = Mathf.Max(0f, swapRecharge - Time.deltaTime);
         var target = swapRecharge == 0f ? FindSwapTarget() : null;
-        var swapped = target != null && Application.isFocused && Keyboard.current?.eKey.wasPressedThisFrame == true;
+        var swapped = target != null && Application.isFocused && Keyboard.current?.qKey.wasPressedThisFrame == true;
         if (swapped)
         {
             var origin = slime.Position;
@@ -204,11 +213,11 @@ public sealed partial class LevelController : MonoBehaviour
             target.TeleportTo(origin);
             previousSlimePosition = slime.Position;
             Physics2D.SyncTransforms();
-            swapRecharge = balance.swapCooldown;
+            swapRecharge = SwapCooldown;
             GameAudio.Play(swapSound, balance.swapSoundVolume);
         }
 
-        hud.SetSwap(swapRecharge, balance.swapCooldown, target != null);
+        hud.SetSwap(swapRecharge, SwapCooldown, target != null);
         return swapped;
     }
 
@@ -219,10 +228,10 @@ public sealed partial class LevelController : MonoBehaviour
         {
             shieldRemaining = Mathf.Max(0f, shieldRemaining - Time.deltaTime);
             if (shieldRemaining == 0f)
-                shieldRecharge = shieldConnected ? balance.shieldSuccessCooldown : balance.shieldMissCooldown;
+                shieldRecharge = shieldConnected ? balance.shieldSuccessCooldown : ShieldMissCooldown;
         }
         else if (shieldRecharge == 0f && Application.isFocused &&
-            Keyboard.current?.qKey.wasPressedThisFrame == true)
+            Keyboard.current?.eKey.wasPressedThisFrame == true)
         {
             shieldRemaining = balance.shieldDuration;
             shieldConnected = false;
@@ -261,7 +270,7 @@ public sealed partial class LevelController : MonoBehaviour
         var color = shieldConnected ? balance.shieldHitColor : balance.shieldColor;
         shieldRing.startColor = shieldRing.endColor = color;
         hud.SetParry(shieldRemaining, shieldRecharge, balance.shieldDuration,
-            shieldConnected ? balance.shieldSuccessCooldown : balance.shieldMissCooldown);
+            shieldConnected ? balance.shieldSuccessCooldown : ShieldMissCooldown);
     }
 
     private Projectile FindSwapTarget()
@@ -303,7 +312,14 @@ public sealed partial class LevelController : MonoBehaviour
         arenaCamera.orthographicSize = .5f * Mathf.Max(minimumArenaHeight, minimumArenaWidth / fittedAspect);
         var width = 2f * arenaCamera.orthographicSize * fittedAspect;
         var height = 2f * arenaCamera.orthographicSize;
-        floor.size = new Vector2(width, height);
+        if (floor.drawMode == SpriteDrawMode.Simple)
+        {
+            var spriteSize = floor.sprite.bounds.size;
+            var scale = Mathf.Max(width / spriteSize.x, height / spriteSize.y);
+            floor.transform.localScale = new Vector3(scale, scale, 1f);
+        }
+        else
+            floor.size = new Vector2(width, height);
         SetWall(leftWall, new Vector2(-width * .5f + thickness * .5f, 0), new Vector2(thickness, height));
         SetWall(rightWall, new Vector2(width * .5f - thickness * .5f, 0), new Vector2(thickness, height));
         SetWall(topWall, new Vector2(0, height * .5f - thickness * .5f), new Vector2(width, thickness));
@@ -334,6 +350,7 @@ public sealed partial class LevelController : MonoBehaviour
 
         if (tutorialStep != TutorialStep.None)
         {
+            grandmaAnimation?.Animate(Time.fixedDeltaTime * ArenaSpeed);
             TickTutorial();
             return;
         }
@@ -364,11 +381,11 @@ public sealed partial class LevelController : MonoBehaviour
 
         var pendingReinforcements = UpdateReinforcements(arenaStep);
         var underAttack = moreShots || bullets.Count > 0 || kamikazes.Count > 0 || pendingReinforcements;
-        UpdateFireballs(arenaStep, underAttack);
+        UpdateLightning(arenaStep, underAttack);
         if (finished)
             return;
 
-        if (!underAttack && fireballs.Count == 0)
+        if (!underAttack && lightningStrikes.Count == 0)
         {
             waveDelay -= arenaStep;
             if (waveDelay <= 0f)
@@ -381,6 +398,14 @@ public sealed partial class LevelController : MonoBehaviour
 
                 NextWave();
             }
+        }
+
+        if (grandmaAnimation != null)
+        {
+            if (pieceTimer <= grandmaAnimation.SearchDuration)
+                thrownPieces.RemoveAll(piece => piece == null || !piece.gameObject.activeSelf);
+
+            grandmaAnimation.Animate(arenaStep, thrownPieces.Count < 4 ? pieceTimer : float.PositiveInfinity);
         }
 
         pieceTimer -= arenaStep;
@@ -398,39 +423,39 @@ public sealed partial class LevelController : MonoBehaviour
         }
     }
 
-    private void UpdateFireballs(float step, bool spawn)
+    private void UpdateLightning(float step, bool spawn)
     {
-        for (var i = fireballs.Count - 1; i >= 0; i--)
+        for (var i = lightningStrikes.Count - 1; i >= 0; i--)
         {
-            var fireball = fireballs[i];
-            if (fireball.Tick(step, slime))
+            var strike = lightningStrikes[i];
+            if (strike.Tick(step, slime, balance.lightningSound, balance.lightningSoundVolume))
             {
-                Destroy(fireball.gameObject);
-                fireballs.RemoveAt(i);
+                Destroy(strike.gameObject);
+                lightningStrikes.RemoveAt(i);
             }
             if (finished)
                 return;
         }
 
-        var interval = waves[wave - 1].fireballInterval;
+        var interval = waves[wave - 1].lightningInterval;
         if (!spawn || interval <= 0f)
             return;
 
-        fireballTimer -= step;
-        if (fireballTimer > 0f)
+        lightningTimer -= step;
+        if (lightningTimer > 0f)
             return;
 
-        SpawnFireball(interval);
+        SpawnLightning(interval);
     }
 
-    private void SpawnFireball(float interval)
+    private void SpawnLightning(float interval)
     {
         var bounds = ArenaBounds;
         var grandmaBounds = grandma.HitBounds;
-        var radius = fireballRadius;
+        var radius = lightningRadius;
         if (bounds.extents.x < radius || bounds.extents.y < radius)
         {
-            fireballTimer = .2f;
+            lightningTimer = .2f;
             return;
         }
         var playerPosition = slime.Position;
@@ -439,18 +464,18 @@ public sealed partial class LevelController : MonoBehaviour
         for (var attempt = 0; attempt < 20; attempt++)
         {
             var point = attempt < 16
-                ? playerPosition + Random.insideUnitCircle.normalized * Random.Range(.6f, fireballAimSpread)
+                ? playerPosition + Random.insideUnitCircle.normalized * Random.Range(.6f, lightningAimSpread)
                 : new Vector2(Random.Range(min.x, max.x), Random.Range(min.y, max.y));
             point = Vector2.Max(min, Vector2.Min(max, point));
             if (grandmaBounds.SqrDistance(new Vector3(point.x, point.y, grandmaBounds.center.z)) <= radius * radius)
                 continue;
 
             var sky = arenaCamera.ViewportToWorldPoint(new Vector3(.5f, 1f, arenaCamera.nearClipPlane)).y;
-            fireballs.Add(FireballHazard.Spawn(transform, point, sky, radius, fireballMaterial));
-            fireballTimer = interval * Random.Range(.8f, 1.2f);
+            lightningStrikes.Add(LightningHazard.Spawn(transform, point, sky, radius, lightningMaterial));
+            lightningTimer = interval * Random.Range(.8f, 1.2f);
             return;
         }
-        fireballTimer = .2f;
+        lightningTimer = .2f;
     }
 
     private void DropHealingItem()
@@ -487,9 +512,9 @@ public sealed partial class LevelController : MonoBehaviour
         waveKamikazeDefeats = 0;
         reinforcementTimer = setup.reinforcements.Length > 0 ? setup.reinforcements[0].delay : 0f;
         SpawnEnemies(setup.shooters, setup.kamikazes);
-        fireballTimer = setup.fireballStartDelay;
-        if (setup.fireballInterval > 0f && fireballTimer <= 0f)
-            SpawnFireball(setup.fireballInterval);
+        lightningTimer = setup.lightningStartDelay;
+        if (setup.lightningInterval > 0f && lightningTimer <= 0f)
+            SpawnLightning(setup.lightningInterval);
 
         UpdateStatus();
         ShowWaveNotice();
@@ -554,11 +579,8 @@ public sealed partial class LevelController : MonoBehaviour
         var offset = Vector2.Max(-Vector2.one, Vector2.Min(Vector2.one, position));
         var runner = Instantiate(kamikazePrefab, center, Quaternion.identity, enemies);
         var entry = center + Vector2.Scale(offset, bounds.extents);
-        var margin = runner.GetComponent<SpriteRenderer>().bounds.extents;
-        if (Mathf.Abs(offset.x) >= Mathf.Abs(offset.y))
-            entry.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x + margin.x + .5f);
-        else
-            entry.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y + margin.y + .5f);
+        var axis = Mathf.Abs(offset.x) >= Mathf.Abs(offset.y) ? 0 : 1;
+        entry[axis] = OffscreenEntryCoordinate(runner.GetComponent<SpriteRenderer>(), axis, Mathf.Sign(offset[axis]));
         runner.Begin(entry, grandma, this);
         kamikazes.Add(runner);
     }
@@ -571,8 +593,8 @@ public sealed partial class LevelController : MonoBehaviour
 
     private void ShowWaveNotice()
     {
-        waveNotice.text = waves[wave - 1].fireballInterval > 0f
-            ? $"Wave {wave} / {waves.Length} - Fireballs"
+        waveNotice.text = waves[wave - 1].lightningInterval > 0f
+            ? $"Wave {wave} / {waves.Length} - Lightning"
             : $"Wave {wave} / {waves.Length}";
         waveNoticeUntil = Time.time + 1.8f;
         waveNotice.enabled = true;
@@ -589,20 +611,32 @@ public sealed partial class LevelController : MonoBehaviour
         var restricted = ShooterHudArea(visualExtents);
         if (Mathf.Abs(offset.x) / bounds.extents.x > Mathf.Abs(offset.y) / bounds.extents.y)
         {
-            entrance.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x + visualExtents.x + .4f);
+            entrance.x = OffscreenEntryCoordinate(shooter.GetComponent<SpriteRenderer>(), 0, Mathf.Sign(offset.x));
             target.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x - edgeInset);
             if (CrossesHudArea(entrance, target, restricted))
                 target.y = entrance.y = Mathf.Max(bounds.min.y + edgeInset, restricted.yMin - .05f);
         }
         else
         {
-            entrance.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y + visualExtents.y + .4f);
+            entrance.y = OffscreenEntryCoordinate(shooter.GetComponent<SpriteRenderer>(), 1, Mathf.Sign(offset.y));
             target.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y - edgeInset);
             if (CrossesHudArea(entrance, target, restricted))
                 target.x = entrance.x = Mathf.Min(bounds.max.x - edgeInset, restricted.xMax + .05f);
         }
 
         shooter.ApproachFrom(entrance, target);
+    }
+
+    private float OffscreenEntryCoordinate(SpriteRenderer visual, int axis, float side)
+    {
+        var viewport = new Vector3(.5f, .5f, arenaCamera.nearClipPlane);
+        viewport[axis] = side < 0f ? 0f : 1f;
+        var edge = arenaCamera.ViewportToWorldPoint(viewport)[axis];
+        var spriteBounds = visual.bounds;
+        // Reserve space for an off-center sprite pivot, including after the sprite flips.
+        var padding = spriteBounds.extents[axis] +
+            Mathf.Abs(spriteBounds.center[axis] - visual.transform.position[axis]);
+        return edge + side * (padding + .1f);
     }
 
     public Rect ShooterHudArea(Vector2 extents)
@@ -719,8 +753,6 @@ public sealed partial class LevelController : MonoBehaviour
         bullet.Deflect(impact, hitTime, returnBoost, ArenaSpeed);
         if (tutorialStep == TutorialStep.None)
             parries++;
-        else if (tutorialStep == TutorialStep.Reflect || tutorialStep == TutorialStep.Shield)
-            tutorialReflected = true;
         GameAudio.Play(sound, .8f);
         if (HitShooter(impact, bullet.Position, bullet.Radius))
             RemoveBullet(index);
@@ -756,6 +788,8 @@ public sealed partial class LevelController : MonoBehaviour
 
         if (target == null)
             return false;
+        if (tutorialStep == TutorialStep.Reflect || tutorialStep == TutorialStep.Shield)
+            tutorialReflected = true;
         if (tutorialStep == TutorialStep.None || tutorialStep == TutorialStep.Reflect || tutorialStep == TutorialStep.Shield)
             target.TakeHit(reflectedDamage, end - start);
         if (target.Current == 0 && tutorialStep == TutorialStep.None)
@@ -850,7 +884,7 @@ public sealed partial class LevelController : MonoBehaviour
         RefreshShield();
         slowRemaining = 0f;
         GameAudio.SetPlaybackSpeed(1f);
-        hud.SetSlowMotion(0f, slowRecharge, balance.slowDuration, balance.slowCooldown);
+        hud.SetSlowMotion(0f, slowRecharge, balance.slowDuration, SlowCooldown);
         slime.SetSlowMotionAfterimages(false);
         waveNotice.enabled = false;
         slime.CanLaunch = false;
@@ -863,8 +897,8 @@ public sealed partial class LevelController : MonoBehaviour
             shooter.HideWarning();
             shooter.StopShotAnimation();
         }
-        foreach (var fireball in fireballs)
-            Destroy(fireball.gameObject);
+        foreach (var lightning in lightningStrikes)
+            Destroy(lightning.gameObject);
         foreach (var runner in kamikazes)
             if (runner != null)
                 runner.Stop();
@@ -906,16 +940,18 @@ public sealed partial class LevelController : MonoBehaviour
                 slime.UpgradeHealth();
                 break;
             case UpgradeMenu.Upgrade.ReturnDamage:
-                reflectedDamage++;
+                reflectedDamage += .5f;
                 break;
-            case UpgradeMenu.Upgrade.Size:
-                slime.UpgradeSize();
-                slime.KeepInside(arenaBounds.bounds);
-                previousSlimePosition = slime.Position;
+            case UpgradeMenu.Upgrade.Cooldowns:
+                cooldownUpgrades++;
+                slowRecharge = Mathf.Max(0f, slowRecharge - SlowAndSwapReduction);
+                swapRecharge = Mathf.Max(0f, swapRecharge - SlowAndSwapReduction);
+                if (!shieldConnected)
+                    shieldRecharge = Mathf.Max(0f, shieldRecharge - ParryMissReduction);
                 break;
         }
         UpdateStatus();
         if (tutorialStep == TutorialStep.Upgrade)
-            CompleteTutorial();
+            BeginTutorialStep(TutorialStep.Lightning);
     }
 }

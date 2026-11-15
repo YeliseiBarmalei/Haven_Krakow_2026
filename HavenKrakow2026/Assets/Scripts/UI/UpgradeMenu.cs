@@ -4,19 +4,21 @@ using UnityEngine.UI;
 
 public sealed class UpgradeMenu : MonoBehaviour
 {
-    public enum Upgrade { GrandmaHealth, SlimeHealth, ReturnDamage, Size }
+    public enum Upgrade { GrandmaHealth, SlimeHealth, ReturnDamage, Cooldowns }
 
     [SerializeField] private Text title;
-    [SerializeField] private Button sizeButton;
-    [SerializeField] private Text sizeLabel;
+    [SerializeField] private Button cooldownButton;
+    [SerializeField] private Text cooldownLabel;
     private Action<Upgrade> onChoose;
     private float previousTimeScale;
 
-    public void Open(int level, bool canGrow, float sizePercent, Action<Upgrade> choose)
+    public void Open(int level, int cooldownUpgrades, int cooldownLimit, Action<Upgrade> choose)
     {
         title.text = $"Level {level}   |   Choose an upgrade";
-        sizeButton.interactable = canGrow;
-        sizeLabel.text = canGrow ? $"Slime Size  +{sizePercent:0.#}% of base" : "Slime Size  (maxed)";
+        cooldownButton.interactable = cooldownUpgrades < cooldownLimit;
+        cooldownLabel.text = cooldownButton.interactable
+            ? $"Shorter Cooldowns  ({cooldownUpgrades}/{cooldownLimit})"
+            : "Shorter Cooldowns  (maxed)";
         onChoose = choose;
         previousTimeScale = Time.timeScale;
         Time.timeScale = 0f;
@@ -26,7 +28,11 @@ public sealed class UpgradeMenu : MonoBehaviour
     public void ChooseGrandmaHealth() => Choose(Upgrade.GrandmaHealth);
     public void ChooseSlimeHealth() => Choose(Upgrade.SlimeHealth);
     public void ChooseReturnDamage() => Choose(Upgrade.ReturnDamage);
-    public void ChooseSize() => Choose(Upgrade.Size);
+    public void ChooseCooldowns()
+    {
+        if (cooldownButton.interactable)
+            Choose(Upgrade.Cooldowns);
+    }
 
     private void Choose(Upgrade upgrade)
     {

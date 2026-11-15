@@ -25,4 +25,8 @@ public sealed class LevelBalance : ScriptableObject
     public Color shieldColor = new Color(.25f, .92f, .62f);
     public Color shieldHitColor = new Color(.77f, 1f, .94f);
     public Material shieldMaterial;
+
+    [Header("Lightning")]
+    public AudioClip lightningSound;
+    [Range(0f, 1f)] public float lightningSoundVolume = .25f;
 }

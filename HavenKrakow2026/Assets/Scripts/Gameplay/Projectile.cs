@@ -3,7 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer), typeof(CircleCollider2D))]
 public sealed class Projectile : MonoBehaviour
 {
-    [SerializeField] private Color deflectedTint = new Color(.46f, 1f, .73f);
+    [SerializeField] private Color deflectedTint = new Color(.25f, .55f, 1f);
     [SerializeField, Min(0f)] private float returnSpeedPerSlimeSpeed = .6f;
 
     private SpriteRenderer visual;

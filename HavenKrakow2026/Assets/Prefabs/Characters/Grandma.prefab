@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 102}
   - component: {fileID: 103}
   - component: {fileID: 104}
+  - component: {fileID: 105}
   m_Layer: 0
   m_Name: Grandma
   m_TagString: Untagged
@@ -249,3 +250,30 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
+--- !u!114 &105
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d210d490341638df5701b88ec79a021, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GrandmaAnimation
+  idleFrames:
+  - {fileID: -8862427713676508149, guid: d8058596f38ee3d4da3bf5ed53dc261e, type: 3}
+  - {fileID: -8063845738669132171, guid: d8058596f38ee3d4da3bf5ed53dc261e, type: 3}
+  - {fileID: -5571798581269513250, guid: d8058596f38ee3d4da3bf5ed53dc261e, type: 3}
+  - {fileID: 4559085366212935290, guid: d8058596f38ee3d4da3bf5ed53dc261e, type: 3}
+  searchingFrames:
+  - {fileID: -8070053966705989404, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  - {fileID: 1803580389433839802, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  - {fileID: 8710474570516168488, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  - {fileID: 1972697054883287473, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  - {fileID: 7845092437421059507, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  - {fileID: -6834341490440164569, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  - {fileID: 3880149986097898777, guid: 9c6f981d95a326c4fa6721f81e384265, type: 3}
+  idleFramesPerSecond: 4
+  searchingFramesPerSecond: 8

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public sealed class ArenaHud : MonoBehaviour
@@ -33,6 +34,52 @@ public sealed class ArenaHud : MonoBehaviour
     [SerializeField] private Bar slowBar, swapBar, parryBar;
     [SerializeField] private Image slowTint;
     [SerializeField] private Image[] slowEdges;
+    [SerializeField] private Font eliteBadgeFont;
+    [SerializeField] private GameObject skillTooltip;
+    [SerializeField] private Text skillTooltipText;
+    private Text hoveredSkill;
+
+    private void UpdateSkillTooltip()
+    {
+        if (skillTooltip == null || skillTooltipText == null)
+            return;
+
+        Text hovered = null;
+        if (Application.isFocused && Time.timeScale > 0f && !FadeTransition.IsBusy && Mouse.current != null)
+        {
+            var cursor = Mouse.current.position.ReadValue();
+            if (ContainsSkill(slowLabel, cursor))
+                hovered = slowLabel;
+            else if (ContainsSkill(swapLabel, cursor))
+                hovered = swapLabel;
+            else if (ContainsSkill(parryLabel, cursor))
+                hovered = parryLabel;
+        }
+
+        if (hovered == hoveredSkill)
+            return;
+
+        hoveredSkill = hovered;
+        skillTooltip.SetActive(hovered != null);
+        if (hovered == null)
+            return;
+
+        if (hovered == slowLabel)
+            skillTooltipText.text = "<b>Space  ·  Slow Motion</b>\nSlows bullets and enemies while you move at full speed.";
+        else if (hovered == swapLabel)
+            skillTooltipText.text = "<b>Q  ·  Swap</b>\nTrade places with the nearest eligible bullet. It keeps flying in the same direction.";
+        else
+            skillTooltipText.text = "<b>E  ·  Parry</b>\nBriefly shield Grandma and reflect incoming bullets. A successful parry recharges faster.";
+
+        skillTooltip.transform.SetAsLastSibling();
+    }
+
+    private static bool ContainsSkill(Text label, Vector2 cursor)
+    {
+        var panel = (RectTransform)label.transform.parent;
+        return panel.gameObject.activeInHierarchy &&
+            RectTransformUtility.RectangleContainsScreenPoint(panel, cursor);
+    }
 
     public void SetSlowMotion(float remaining, float recharge, float duration, float cooldown)
     {
@@ -47,34 +94,34 @@ public sealed class ArenaHud : MonoBehaviour
             edge.canvasRenderer.SetAlpha(strength);
 
         slowLabel.text = active ? $"{remaining:0.0}s" :
-            recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : "SPACE";
-        var fraction = active ? remaining / duration : 1f - recharge / cooldown;
+            recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : "Space";
+        var fraction = active ? remaining / duration : cooldown > 0f ? 1f - recharge / cooldown : 1f;
         slowBar.fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
     }
 
     public void SetSwap(float recharge, float cooldown, bool hasTarget)
     {
-        swapLabel.text = recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : hasTarget ? "E" : "NO SHOT";
+        swapLabel.text = recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : hasTarget ? "Q" : "NO SHOT";
         swapBar.fill.anchorMax = new Vector2(recharge > 0f ? Mathf.Clamp01(1f - recharge / cooldown) : hasTarget ? 1f : 0f, 1f);
     }
 
     public void SetParry(float remaining, float recharge, float duration, float cooldown)
     {
         parryLabel.text = remaining > 0f ? "ACTIVE" :
-            recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : "Q";
+            recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : "E";
         var fraction = remaining > 0f ? remaining / duration : cooldown > 0f ? 1f - recharge / cooldown : 1f;
         parryBar.fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
     }
 
     public void SetStatus(int wave, int totalWaves, float slimeHp, int slimeMax, float grandmaHp, int grandmaMax,
-        int level, int pieces, int requiredPieces, int damage)
+        int level, int pieces, int requiredPieces, float damage)
     {
         slimeHealth.Set(slimeHp, slimeMax);
         grandmaHealth.Set(grandmaHp, grandmaMax);
         progress.Set(pieces, requiredPieces);
         slimeValue.text = $"{slimeHp:0.#}/{slimeMax} HP";
         grandmaValue.text = $"{grandmaHp:0.#}/{grandmaMax} HP";
-        progressValue.text = $"Lv. {level}    Pieces {pieces}/{requiredPieces}    Return dmg {damage}";
+        progressValue.text = $"Lv. {level}    Pieces {pieces}/{requiredPieces}    Return dmg {damage:0.#}";
         waveValue.text = $"WAVE {wave} / {totalWaves}";
     }
 
@@ -92,7 +139,7 @@ public sealed class ArenaHud : MonoBehaviour
             rect.anchorMin = rect.anchorMax = new Vector2(0f, .5f);
             rect.anchoredPosition = new Vector2(-17f, 0f);
             rect.sizeDelta = new Vector2(32f, 32f);
-            badge.font = waveValue.font;
+            badge.font = eliteBadgeFont != null ? eliteBadgeFont : waveValue.font;
             badge.fontSize = 28;
             badge.text = "☠";
             badge.alignment = TextAnchor.MiddleCenter;
@@ -120,6 +167,7 @@ public sealed class ArenaHud : MonoBehaviour
 
     private void LateUpdate()
     {
+        UpdateSkillTooltip();
         var root = (RectTransform)transform;
         var panel = SlimePanelScreenRect();
         for (var i = enemyBars.Count - 1; i >= 0; i--)
@@ -134,7 +182,8 @@ public sealed class ArenaHud : MonoBehaviour
 
             var track = entry.Bar.track;
             var actor = entry.Shooter.Health;
-            var world = (Vector2)entry.Shooter.transform.position + Vector2.up * (actor.Radius + .16f);
+            var sprite = entry.Shooter.VisualBounds;
+            var world = new Vector3(sprite.center.x, sprite.max.y + .12f, sprite.center.z);
             var screen = arenaCamera.WorldToScreenPoint(world);
             var visible = entry.Shooter.CanBeHit && screen.z > 0f && arenaCamera.pixelRect.Contains(screen);
             if (!visible)
