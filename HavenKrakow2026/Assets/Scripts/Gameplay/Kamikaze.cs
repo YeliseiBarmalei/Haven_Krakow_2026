@@ -6,8 +6,10 @@ public sealed class Kamikaze : MonoBehaviour
     [SerializeField, Min(.1f)] private float startingSpeed = .9f;
     [SerializeField, Min(.1f)] private float acceleration = 1.25f;
     [SerializeField, Min(.1f)] private float maximumSpeed = 5f;
-    [SerializeField, Range(.1f, 1f)] private float requiredRamSpeed = .8f;
     [SerializeField, Min(.5f)] private float explosionDamage = 2f;
+    [SerializeField, Min(.1f)] private float explosionVisualScale = 1.8f;
+    [SerializeField] private AudioClip explosionSound;
+    [SerializeField, Range(0f, 1f)] private float explosionVolume = .55f;
 
     private Rigidbody2D body;
     private Collider2D shape;
@@ -70,7 +72,7 @@ public sealed class Kamikaze : MonoBehaviour
 
     private void TryRam(Collider2D other)
     {
-        if (!IsActive || !other.TryGetComponent<SlimeController>(out var slime) || !slime.CanRam(requiredRamSpeed))
+        if (!IsActive || !other.TryGetComponent<SlimeController>(out var slime) || !slime.CanRam)
             return;
 
         Explode();
@@ -86,7 +88,8 @@ public sealed class Kamikaze : MonoBehaviour
     private void Explode()
     {
         Stop();
-        ImpactBurst.Spawn(visual, body.position, Vector2.zero, new Color(1f, .28f, .08f), true);
+        ImpactBurst.SpawnExplosion(visual, body.position, explosionVisualScale);
+        GameAudio.Play(explosionSound, explosionVolume);
         gameObject.SetActive(false);
         Destroy(gameObject);
     }

@@ -368,36 +368,38 @@ MonoBehaviour:
   topWall: {fileID: 384628316}
   bottomWall: {fileID: 2012812446}
   shooterPrefab: {fileID: 105, guid: 5b44b2d3d4c3ddf7067555d72ef91f5f, type: 3}
-  kamikazePrefab: {fileID: 105, guid: 391837fee188ab1e553f06a7172158c4, type: 3}
   balance: {fileID: 11400000, guid: 7eeef58c5cf2452ca79278714f331e69, type: 2}
   waves:
   - shooters:
     - position: {x: -0.66, y: 0.54}
       elite: 0
-    kamikazes:
-    - {x: 1, y: -0.48}
     fireballInterval: 2.8
+    fireballStartDelay: 2.5
   - shooters:
     - position: {x: 0.85, y: 0.5}
       elite: 1
     fireballInterval: 2.4
+    fireballStartDelay: 1.5
   - shooters:
     - position: {x: -0.9, y: 0.4}
       elite: 0
     fireballInterval: 1.9
+    fireballStartDelay: 1.5
   - shooters:
     - position: {x: 0.9, y: 0.5}
       elite: 1
     fireballInterval: 1.5
+    fireballStartDelay: 1.5
   - shooters:
     - position: {x: -0.9, y: 0.5}
       elite: 1
     fireballInterval: 2.2
+    fireballStartDelay: 1.5
   fireballMaterial: {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
   fireballRadius: 1.5
   fireballAimSpread: 2.8
   mainMenuScene: MainMenu
-  nextLevelScene: 
+  nextLevelScene: Level03
   piecePrefab: {fileID: 104, guid: 84eca4a4978d314b81e25c95f3517dbb, type: 3}
   bandageSprite: {fileID: 21300000, guid: 1ed06827b386479f916600cdf19c36a0, type: 3}
   slimeHealSprite: {fileID: 21300000, guid: 49d802993e254ae885896950707109ff, type: 3}

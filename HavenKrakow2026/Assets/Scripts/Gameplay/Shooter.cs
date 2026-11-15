@@ -18,6 +18,8 @@ public sealed class Shooter : MonoBehaviour
     [SerializeField, Min(0f)] private float knockbackMultiplier = 1f;
     [SerializeField, Min(.1f)] private float maxKnockbackSpeed = 3f;
     [Header("Movement")]
+    [SerializeField] private Sprite[] walkFrames;
+    [SerializeField, Min(.1f)] private float walkFramesPerSecond = 8f;
     [SerializeField, Min(.1f)] private float approachSpeed = 3.8f;
     [SerializeField, Min(.1f)] private float advancePerShot = .42f;
     [SerializeField, Min(.1f)] private float repositionSpeed = 1.9f;
@@ -52,6 +54,8 @@ public sealed class Shooter : MonoBehaviour
     private SpriteRenderer visual;
     private Sprite idleFrame;
     private float shotAnimationRemaining;
+    private float walkFrame;
+    private bool walking;
 
     public bool HasShots => isActiveAndEnabled && (shotsLeft > 0 || postShotTime > 0f || repositionTime > 0f);
     public bool CanBeHit => isActiveAndEnabled && !approaching;
@@ -118,6 +122,7 @@ public sealed class Shooter : MonoBehaviour
 
         var step = Time.fixedDeltaTime * arenaSpeed;
         UpdateShotAnimation(step);
+        UpdateWalkAnimation(step);
         if (!HasShots)
             return;
 
@@ -271,7 +276,34 @@ public sealed class Shooter : MonoBehaviour
     public void StopShotAnimation()
     {
         shotAnimationRemaining = 0f;
+        walking = false;
+        walkFrame = 0f;
         visual.sprite = idleFrame;
+    }
+
+    private void UpdateWalkAnimation(float step)
+    {
+        if (walkFrames == null || walkFrames.Length == 0)
+            return;
+
+        var velocity = approaching
+            ? (approachTarget - (Vector2)transform.position).normalized * approachSpeed
+            : body.linearVelocity / motionScale;
+        if (shotAnimationRemaining > 0f || (!approaching && repositionTime <= 0f) ||
+            velocity.sqrMagnitude < .01f)
+        {
+            if (walking && shotAnimationRemaining <= 0f)
+                visual.sprite = idleFrame;
+            walking = false;
+            walkFrame = 0f;
+            return;
+        }
+
+        walking = true;
+        FaceHorizontally(velocity.x);
+        visual.sprite = walkFrames[(int)walkFrame];
+        walkFrame = Mathf.Repeat(walkFrame + step * walkFramesPerSecond * velocity.magnitude / repositionSpeed,
+            walkFrames.Length);
     }
 
     private static float DistanceToEdge(Bounds bounds, Vector2 direction)

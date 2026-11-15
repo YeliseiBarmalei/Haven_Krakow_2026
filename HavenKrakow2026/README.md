@@ -1,5 +1,7 @@
 # Editing the game
 
+The kamikaze explosion uses [Explosion-LS100155 by Fg2](https://commons.wikimedia.org/wiki/File:Explosion-LS100155.ogg), a field recording released into the public domain.
+
 See [the game design document](DESIGN.md) for the current rules, level script, and balance values.
 
 Open `MainMenu` and choose **Levels**. Level 1 is available immediately. Winning it unlocks Level 2 in the menu and enables the **Next Level** route from the results screen. Open `Level01` or `Level02` directly to test either level.

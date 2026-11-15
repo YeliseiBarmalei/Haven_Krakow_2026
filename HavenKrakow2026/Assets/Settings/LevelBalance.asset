@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d4fe4f79caf43e383b668cb742df922, type: 3}
   m_Name: LevelBalance
   m_EditorClassIdentifier: Assembly-CSharp::LevelBalance
-  slowDuration: 3
-  slowCooldown: 18
-  swapCooldown: 12
-  swapSoundVolume: 0.25
   pieceInterval: 10
   startingUpgradeCost: 2
+  slowDuration: 3
+  slowCooldown: 18
+  swapCooldown: 18
+  swapSoundVolume: 0.25
   shieldDuration: 0.25
-  shieldMissCooldown: 15
-  shieldSuccessCooldown: 3
+  shieldMissCooldown: 10
+  shieldSuccessCooldown: 2
   shieldPadding: 0
   shieldReturnBoost: 8
   shieldRingWidth: 0.11

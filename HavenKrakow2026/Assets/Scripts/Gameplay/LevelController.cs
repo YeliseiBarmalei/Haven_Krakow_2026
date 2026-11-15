@@ -20,8 +20,20 @@ public sealed partial class LevelController : MonoBehaviour
         public EnemySpawn[] shooters;
         [Tooltip("Normalized entry positions along the arena edges.")]
         public Vector2[] kamikazes = System.Array.Empty<Vector2>();
+        public Reinforcement[] reinforcements = System.Array.Empty<Reinforcement>();
         [Min(0f), Tooltip("Seconds between fireballs. Lower values spawn them more often. Zero disables the event.")]
         public float fireballInterval;
+        [Min(0f), Tooltip("Seconds from wave start until the first fireball appears.")]
+        public float fireballStartDelay;
+    }
+
+    [System.Serializable]
+    private sealed class Reinforcement
+    {
+        [Min(0f)] public float delay;
+        [Min(0)] public int requiredKamikazeDefeats;
+        public EnemySpawn[] shooters = System.Array.Empty<EnemySpawn>();
+        public Vector2[] kamikazes = System.Array.Empty<Vector2>();
     }
 
     [SerializeField] private SlimeController slime;
@@ -93,6 +105,9 @@ public sealed partial class LevelController : MonoBehaviour
     private float fireballTimer;
     private readonly List<FireballHazard> fireballs = new();
     private readonly List<Kamikaze> kamikazes = new();
+    private int nextReinforcement;
+    private int waveKamikazeDefeats;
+    private float reinforcementTimer;
 
     public Bounds ArenaBounds => arenaBounds.bounds;
     public float ProjectileRadius => projectilePrefab.GetComponent<CircleCollider2D>().radius * projectilePrefab.transform.localScale.x;
@@ -347,7 +362,8 @@ public sealed partial class LevelController : MonoBehaviour
                 return;
         }
 
-        var underAttack = moreShots || bullets.Count > 0 || kamikazes.Count > 0;
+        var pendingReinforcements = UpdateReinforcements(arenaStep);
+        var underAttack = moreShots || bullets.Count > 0 || kamikazes.Count > 0 || pendingReinforcements;
         UpdateFireballs(arenaStep, underAttack);
         if (finished)
             return;
@@ -466,10 +482,54 @@ public sealed partial class LevelController : MonoBehaviour
 
     private void SpawnWave()
     {
+        var setup = waves[wave - 1];
+        nextReinforcement = 0;
+        waveKamikazeDefeats = 0;
+        reinforcementTimer = setup.reinforcements.Length > 0 ? setup.reinforcements[0].delay : 0f;
+        SpawnEnemies(setup.shooters, setup.kamikazes);
+        fireballTimer = setup.fireballStartDelay;
+        if (setup.fireballInterval > 0f && fireballTimer <= 0f)
+            SpawnFireball(setup.fireballInterval);
+
+        UpdateStatus();
+        ShowWaveNotice();
+    }
+
+    private bool UpdateReinforcements(float step)
+    {
+        var setup = waves[wave - 1];
+        if (nextReinforcement >= setup.reinforcements.Length)
+            return false;
+
+        var group = setup.reinforcements[nextReinforcement];
+        if (waveKamikazeDefeats < group.requiredKamikazeDefeats)
+        {
+            if (kamikazes.Count == 0)
+            {
+                var remaining = group.requiredKamikazeDefeats - waveKamikazeDefeats;
+                for (var i = 0; i < remaining; i++)
+                    SpawnKamikaze(setup.kamikazes[i % setup.kamikazes.Length]);
+            }
+            return true;
+        }
+
+        reinforcementTimer -= step;
+        if (reinforcementTimer <= 0f)
+        {
+            SpawnEnemies(group.shooters, group.kamikazes);
+            nextReinforcement++;
+            if (nextReinforcement < setup.reinforcements.Length)
+                reinforcementTimer = setup.reinforcements[nextReinforcement].delay;
+        }
+
+        return true;
+    }
+
+    private void SpawnEnemies(EnemySpawn[] lineup, Vector2[] runners)
+    {
         var bounds = arenaBounds.bounds;
         var center = (Vector2)bounds.center;
         var extents = (Vector2)bounds.extents - Vector2.one * .55f;
-        var lineup = waves[wave - 1].shooters;
         for (var i = 0; i < lineup.Length; i++)
         {
             var position = Vector2.Max(-Vector2.one, Vector2.Min(Vector2.one, lineup[i].position));
@@ -482,31 +542,31 @@ public sealed partial class LevelController : MonoBehaviour
         }
         if (kamikazePrefab != null)
         {
-            foreach (var position in waves[wave - 1].kamikazes)
-            {
-                var offset = Vector2.Max(-Vector2.one, Vector2.Min(Vector2.one, position));
-                var runner = Instantiate(kamikazePrefab, center, Quaternion.identity, enemies);
-                var entry = center + Vector2.Scale(offset, bounds.extents);
-                var margin = runner.GetComponent<SpriteRenderer>().bounds.extents;
-                if (Mathf.Abs(offset.x) >= Mathf.Abs(offset.y))
-                    entry.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x + margin.x + .5f);
-                else
-                    entry.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y + margin.y + .5f);
-                runner.Begin(entry, grandma, this);
-                kamikazes.Add(runner);
-            }
+            foreach (var position in runners)
+                SpawnKamikaze(position);
         }
-        var fireballInterval = waves[wave - 1].fireballInterval;
-        if (fireballInterval > 0f)
-            SpawnFireball(fireballInterval);
+    }
 
-        UpdateStatus();
-        ShowWaveNotice();
+    private void SpawnKamikaze(Vector2 position)
+    {
+        var bounds = ArenaBounds;
+        var center = (Vector2)bounds.center;
+        var offset = Vector2.Max(-Vector2.one, Vector2.Min(Vector2.one, position));
+        var runner = Instantiate(kamikazePrefab, center, Quaternion.identity, enemies);
+        var entry = center + Vector2.Scale(offset, bounds.extents);
+        var margin = runner.GetComponent<SpriteRenderer>().bounds.extents;
+        if (Mathf.Abs(offset.x) >= Mathf.Abs(offset.y))
+            entry.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x + margin.x + .5f);
+        else
+            entry.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y + margin.y + .5f);
+        runner.Begin(entry, grandma, this);
+        kamikazes.Add(runner);
     }
 
     public void RegisterKamikazeDefeat()
     {
         enemiesDefeated++;
+        waveKamikazeDefeats++;
     }
 
     private void ShowWaveNotice()

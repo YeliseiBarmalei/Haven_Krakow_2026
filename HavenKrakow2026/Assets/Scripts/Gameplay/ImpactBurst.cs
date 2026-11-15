@@ -14,9 +14,12 @@ public sealed class ImpactBurst : MonoBehaviour
 
     private static Sprite shardSprite;
     private static Sprite ringSprite;
+    private static Sprite cloudSprite;
     private static readonly System.Random Random = new System.Random();
     private Shard[] shards;
     private SpriteRenderer ring;
+    private SpriteRenderer flash;
+    private Shard[] smoke;
     private float lifetime;
     private float age;
     private float radius;
@@ -30,21 +33,29 @@ public sealed class ImpactBurst : MonoBehaviour
         burst.Initialize(source, direction, tint, defeated);
     }
 
-    private void Initialize(SpriteRenderer source, Vector2 direction, Color tint, bool defeated)
+    public static void SpawnExplosion(SpriteRenderer source, Vector2 center, float scale)
+    {
+        var burst = new GameObject("Kamikaze Explosion").AddComponent<ImpactBurst>();
+        burst.transform.position = center;
+        burst.transform.localScale = Vector3.one * scale;
+        burst.Initialize(source, Vector2.zero, new Color(1f, .26f, .05f), true, explosion: true);
+    }
+
+    private void Initialize(SpriteRenderer source, Vector2 direction, Color tint, bool defeated, bool explosion = false)
     {
         if (shardSprite == null)
             shardSprite = MakeSprite(false);
         if (ringSprite == null)
             ringSprite = MakeSprite(true);
 
-        lifetime = defeated ? .55f : .26f;
+        lifetime = explosion ? 1.05f : defeated ? .55f : .26f;
         radius = defeated ? 1.55f : .73f;
         ring = AddSprite("Shock Ring", ringSprite, source);
         ring.color = Color.Lerp(tint, Color.white, .35f);
         ring.transform.localScale = Vector3.one * .16f;
 
         var random = Random;
-        shards = new Shard[defeated ? 24 : 10];
+        shards = new Shard[explosion ? 38 : defeated ? 24 : 10];
         var heading = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         for (var i = 0; i < shards.Length; i++)
         {
@@ -69,6 +80,39 @@ public sealed class ImpactBurst : MonoBehaviour
             shard.Transform.localScale = shard.Size;
             shards[i] = shard;
         }
+
+        if (explosion)
+            AddExplosionLayers(source);
+    }
+
+    private void AddExplosionLayers(SpriteRenderer source)
+    {
+        if (cloudSprite == null)
+            cloudSprite = MakeSprite(false, cloud: true);
+
+        flash = AddSprite("Fireball Flash", cloudSprite, source);
+        flash.sortingOrder = ring.sortingOrder + 1;
+        flash.color = new Color(1f, .97f, .76f);
+        flash.transform.localScale = Vector3.one * .35f;
+
+        smoke = new Shard[9];
+        for (var i = 0; i < smoke.Length; i++)
+        {
+            var angle = (i + (float)Random.NextDouble()) * Mathf.PI * 2f / smoke.Length;
+            var outward = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            var puff = AddSprite("Fire and Smoke", cloudSprite, source);
+            puff.sortingOrder = ring.sortingOrder - 1;
+            puff.color = new Color(1f, .35f, .06f, .9f);
+            puff.transform.localScale = Vector3.one * .38f;
+            smoke[i] = new Shard
+            {
+                Renderer = puff,
+                Transform = puff.transform,
+                Velocity = outward * Mathf.Lerp(.6f, 1.25f, (float)Random.NextDouble()),
+                Size = Vector2.one * Mathf.Lerp(.58f, .96f, (float)Random.NextDouble()),
+                Spin = Mathf.Lerp(-85f, 85f, (float)Random.NextDouble())
+            };
+        }
     }
 
     private void LateUpdate()
@@ -81,19 +125,42 @@ public sealed class ImpactBurst : MonoBehaviour
             return;
         }
 
-        var expansion = 1f - (1f - progress) * (1f - progress);
+        var waveProgress = flash != null ? Mathf.Clamp01(age / .45f) : progress;
+        var expansion = 1f - (1f - waveProgress) * (1f - waveProgress);
         ring.transform.localScale = Vector3.one * Mathf.Lerp(.16f, radius * 2f, expansion);
         var ringColor = ring.color;
         ringColor.a = .9f * (1f - expansion);
         ring.color = ringColor;
+        var shardExpansion = 1f - (1f - progress) * (1f - progress);
         foreach (var shard in shards)
         {
-            shard.Transform.localPosition = shard.Velocity * (lifetime * expansion * .55f);
+            shard.Transform.localPosition = shard.Velocity * (lifetime * shardExpansion * .55f);
             shard.Transform.Rotate(0f, 0f, shard.Spin * Time.deltaTime);
             shard.Transform.localScale = shard.Size * Mathf.Lerp(1f, .28f, progress);
             var tint = shard.Tint;
             tint.a = 1f - progress * progress;
             shard.Renderer.color = tint;
+        }
+        if (flash != null)
+            AnimateExplosionLayers(progress);
+    }
+
+    private void AnimateExplosionLayers(float progress)
+    {
+        var flashProgress = Mathf.Clamp01(age / .19f);
+        flash.transform.localScale = Vector3.one * Mathf.Lerp(.35f, 1.5f, flashProgress);
+        flash.color = new Color(1f, Mathf.Lerp(.97f, .42f, flashProgress), .24f, 1f - flashProgress);
+
+        var fire = new Color(1f, .35f, .06f, .95f);
+        var ash = new Color(.22f, .19f, .21f, .7f);
+        foreach (var puff in smoke)
+        {
+            puff.Transform.localPosition = puff.Velocity * Mathf.Sqrt(progress) + Vector2.up * (progress * .45f);
+            puff.Transform.localScale = puff.Size * Mathf.Lerp(.4f, 1.55f, Mathf.Sqrt(progress));
+            puff.Transform.Rotate(0f, 0f, puff.Spin * Time.deltaTime);
+            var color = Color.Lerp(fire, ash, Mathf.Clamp01(progress * 2.7f));
+            color.a *= 1f - progress * progress;
+            puff.Renderer.color = color;
         }
     }
 
@@ -108,7 +175,7 @@ public sealed class ImpactBurst : MonoBehaviour
         return renderer;
     }
 
-    private static Sprite MakeSprite(bool ring)
+    private static Sprite MakeSprite(bool ring, bool cloud = false)
     {
         const int size = 64;
         var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -121,6 +188,12 @@ public sealed class ImpactBurst : MonoBehaviour
                 var point = new Vector2(x + .5f, y + .5f) / size * 2f - Vector2.one;
                 var distance = ring ? Mathf.Abs(point.magnitude - .83f) : Mathf.Abs(point.x) + Mathf.Abs(point.y);
                 var alpha = Mathf.Clamp01((ring ? .11f - distance : .94f - distance) * 28f);
+                if (cloud)
+                {
+                    var angle = Mathf.Atan2(point.y, point.x);
+                    var edge = .79f + .08f * Mathf.Cos(angle * 5f) + .06f * Mathf.Sin(angle * 8f);
+                    alpha = Mathf.Clamp01((edge - point.magnitude) * 12f);
+                }
                 pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
             }
         }

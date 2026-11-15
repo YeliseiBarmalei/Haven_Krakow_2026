@@ -68,6 +68,7 @@ public sealed class SlimeController : MonoBehaviour
     private Vector3 startingScale;
     private bool aiming;
     private bool launched;
+    private bool fullPowerLaunch;
     private SpriteRenderer visual;
     private Color restingTint;
     private float nextHitTime;
@@ -80,8 +81,7 @@ public sealed class SlimeController : MonoBehaviour
     public int Pieces { get; private set; }
     public float Health { get; private set; }
     public bool IsInFlight => launched;
-    public bool CanRam(float requiredSpeedFraction) => CanLaunch && launched &&
-        incomingVelocity.sqrMagnitude >= Mathf.Pow(launchSpeed * requiredSpeedFraction, 2f);
+    public bool CanRam => CanLaunch && launched && fullPowerLaunch;
     public int MaxHealth => maxHealth;
     public bool CanLaunch { get; set; } = true;
     public bool CanDamageGrandma { get; set; } = true;
@@ -274,6 +274,7 @@ public sealed class SlimeController : MonoBehaviour
     {
         body.linearVelocity = Vector2.zero;
         launched = false;
+        fullPowerLaunch = false;
         visual.color = restingTint;
         idleTime = 0f;
         UpdateIdleSprite();
@@ -323,13 +324,15 @@ public sealed class SlimeController : MonoBehaviour
             return;
 
         var worldUnitsPerPixel = 2f * view.orthographicSize / view.pixelHeight;
-        var pull = Vector2.ClampMagnitude((cursor - dragStart) * worldUnitsPerPixel, dragLimit);
+        var rawPull = (cursor - dragStart) * worldUnitsPerPixel;
+        var pull = Vector2.ClampMagnitude(rawPull, dragLimit);
         if (mouse.leftButton.wasReleasedThisFrame)
         {
             if (pull.sqrMagnitude > .01f)
             {
                 body.linearVelocity = pull * (launchSpeed / dragLimit);
                 launched = true;
+                fullPowerLaunch = rawPull.sqrMagnitude >= dragLimit * dragLimit;
                 GameAudio.Play(slideSound, .68f);
                 visual.color = flightTint;
                 visual.sprite = flightSprite;
