@@ -184,7 +184,8 @@ public sealed class SlimeController : MonoBehaviour
             return;
 
         var speed = body.linearVelocity.magnitude;
-        var audible = emitAfterimages && Time.timeScale > 0f && !FadeTransition.IsBusy && speed > stopSpeed;
+        var audible = GameAudio.PlayerMovementEnabled && emitAfterimages && Time.timeScale > 0f &&
+            !FadeTransition.IsBusy && speed > stopSpeed;
         if (audible && slowMotionMovementSource == null)
         {
             slowMotionMovementSource = gameObject.AddComponent<AudioSource>();
@@ -318,7 +319,8 @@ public sealed class SlimeController : MonoBehaviour
                 body.linearVelocity = pull * (launchSpeed / dragLimit);
                 launched = true;
                 fullPowerLaunch = rawPull.sqrMagnitude >= dragLimit * dragLimit;
-                GameAudio.Play(slideSound, .68f);
+                if (GameAudio.PlayerMovementEnabled)
+                    GameAudio.Play(slideSound, .68f);
                 visual.color = flightTint;
                 visual.sprite = flightSprite;
                 visual.flipX = pull.x < 0f;

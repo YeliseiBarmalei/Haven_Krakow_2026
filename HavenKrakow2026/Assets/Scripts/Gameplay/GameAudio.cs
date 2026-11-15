@@ -5,7 +5,7 @@ public static class GameAudio
     private const string VolumeKey = "MasterVolume";
     private const string MusicVolumeKey = "MusicVolume";
     private const string EffectsVolumeKey = "EffectsVolume";
-    private const string EnemyMovementKey = "EnemyMovementSound";
+    private const string PlayerMovementKey = "PlayerMovementSound";
     private const float MusicGain = .65f;
     private static AudioSource source;
     private static AudioSource music;
@@ -57,7 +57,7 @@ public static class GameAudio
     public static float Volume => Mathf.Clamp01(PlayerPrefs.GetFloat(VolumeKey, .8f));
     public static float MusicVolume => Mathf.Clamp01(PlayerPrefs.GetFloat(MusicVolumeKey, 1f));
     public static float EffectsVolume => Mathf.Clamp01(PlayerPrefs.GetFloat(EffectsVolumeKey, 1f));
-    public static bool EnemyMovementEnabled => PlayerPrefs.GetInt(EnemyMovementKey, 1) != 0;
+    public static bool PlayerMovementEnabled => PlayerPrefs.GetInt(PlayerMovementKey, 1) != 0;
 
     public static void ApplyVolume()
     {
@@ -74,9 +74,9 @@ public static class GameAudio
     public static void SetMusicVolume(float value) => SaveVolume(MusicVolumeKey, value);
     public static void SetEffectsVolume(float value) => SaveVolume(EffectsVolumeKey, value);
 
-    public static void SetEnemyMovementEnabled(bool enabled)
+    public static void SetPlayerMovementEnabled(bool enabled)
     {
-        PlayerPrefs.SetInt(EnemyMovementKey, enabled ? 1 : 0);
+        PlayerPrefs.SetInt(PlayerMovementKey, enabled ? 1 : 0);
         PlayerPrefs.Save();
     }
 

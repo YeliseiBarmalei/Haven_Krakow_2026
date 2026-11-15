@@ -21,11 +21,11 @@ MonoBehaviour:
   shieldDuration: 0.25
   shieldMissCooldown: 10
   shieldSuccessCooldown: 2
-  shieldPadding: 0
+  shieldPadding: 0.3
   shieldReturnBoost: 8
-  shieldRingWidth: 0.11
-  shieldColor: {r: 0.25, g: 0.92, b: 0.62, a: 1}
-  shieldHitColor: {r: 0.77, g: 1, b: 0.94, a: 1}
-  shieldMaterial: {fileID: 0}
+  shieldSprite: {fileID: 2389193319765324094, guid: f02c7ccff18378e47828f925299cc9d1, type: 3}
+  shieldColor: {r: 1, g: 1, b: 1, a: 0.42}
+  shieldHitColor: {r: 1, g: 1, b: 1, a: 0.68}
+  lightningWarningIcon: {fileID: -3779678137760624508, guid: 3d7b222f9c3e22741918a1543918410f, type: 3}
   lightningSound: {fileID: 8300000, guid: 09ab6239c7155954d9d16a8a0bb22d52, type: 3}
   lightningSoundVolume: 0.25

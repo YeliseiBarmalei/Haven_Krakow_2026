@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 [RequireComponent(typeof(Button))]
-public sealed class EnemyMovementAudioControl : MonoBehaviour
+public sealed class PlayerMovementAudioControl : MonoBehaviour
 {
     [SerializeField] private Text label;
 
@@ -20,12 +20,12 @@ public sealed class EnemyMovementAudioControl : MonoBehaviour
 
     private void ToggleSound()
     {
-        GameAudio.SetEnemyMovementEnabled(!GameAudio.EnemyMovementEnabled);
+        GameAudio.SetPlayerMovementEnabled(!GameAudio.PlayerMovementEnabled);
         UpdateLabel();
     }
 
     private void UpdateLabel()
     {
-        label.text = GameAudio.EnemyMovementEnabled ? "Enemy Movement: On" : "Enemy Movement: Off";
+        label.text = GameAudio.PlayerMovementEnabled ? "Player Movement Sound: On" : "Player Movement Sound: Off";
     }
 }

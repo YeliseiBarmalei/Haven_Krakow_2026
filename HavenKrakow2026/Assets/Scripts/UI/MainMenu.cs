@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public sealed class MainMenu : MonoBehaviour
@@ -16,17 +17,26 @@ public sealed class MainMenu : MonoBehaviour
 
     [SerializeField] private string tutorialLevel = "Level01";
     [SerializeField] private string tutorialScene = "Tutorial";
-    [SerializeField] private string levelSelectScene = "LevelSelect";
+    [SerializeField] private string introScene = "Intro";
     [SerializeField] private string mainMenuScene = "MainMenu";
     [SerializeField] private LevelEntry[] levels = System.Array.Empty<LevelEntry>();
     [SerializeField] private Canvas menuCanvas;
     [SerializeField] private AudioClip uiClick;
     [SerializeField] private AudioClip backgroundMusic;
+    [SerializeField] private RectTransform quitButton;
+    [SerializeField] private GameObject menuCard;
+    [SerializeField] private GameObject settingsCard;
+
+    private Vector2 quitHome;
+    private Vector2 quitVelocity;
 
     private void Start()
     {
         GameAudio.ApplyVolume();
         GameAudio.PlayMusic(backgroundMusic);
+        if (quitButton != null)
+            quitHome = quitButton.anchoredPosition;
+
         foreach (var button in menuCanvas.GetComponentsInChildren<Button>(true))
             button.onClick.AddListener(() => GameAudio.Play(uiClick, .65f));
 
@@ -39,7 +49,20 @@ public sealed class MainMenu : MonoBehaviour
         }
     }
 
-    public void Play() => FadeTransition.Load(levelSelectScene);
+    public void Play() => FadeTransition.Load(introScene);
+
+    public void OpenSettings() => ShowSettings(true);
+
+    public void CloseSettings() => ShowSettings(false);
+
+    private void ShowSettings(bool open)
+    {
+        if (FadeTransition.IsBusy || menuCard == null || settingsCard == null)
+            return;
+
+        menuCard.SetActive(!open);
+        settingsCard.SetActive(open);
+    }
 
     public void Back() => FadeTransition.Load(mainMenuScene);
 
@@ -76,15 +99,42 @@ public sealed class MainMenu : MonoBehaviour
 
     private static string UnlockKey(string scene) => $"LevelUnlocked.{scene}";
 
-    public void Quit()
+    private void Update()
     {
-        if (FadeTransition.IsBusy)
+        if (quitButton == null || !quitButton.gameObject.activeInHierarchy ||
+            !Application.isFocused || FadeTransition.IsBusy || Mouse.current == null)
             return;
 
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
+        var cursor = Mouse.current.position.ReadValue();
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(quitButton, cursor, null, out var localPoint))
+            return;
+
+        const float repelDistance = 55f;
+        var rect = quitButton.rect;
+        var nearest = new Vector2(Mathf.Clamp(localPoint.x, rect.xMin, rect.xMax),
+            Mathf.Clamp(localPoint.y, rect.yMin, rect.yMax));
+        var away = rect.center - localPoint;
+        var proximity = 1f - Mathf.Clamp01(Vector2.Distance(localPoint, nearest) / repelDistance);
+        var position = quitButton.anchoredPosition;
+        if (position.y >= quitHome.y && away.y > 0f)
+            away = away.x >= 0f ? Vector2.right : Vector2.left;
+
+        var acceleration = (quitHome - position) * 28f;
+        acceleration += (away.sqrMagnitude > .01f ? away.normalized : Vector2.down) * (8500f * proximity);
+
+        var dt = Mathf.Min(Time.unscaledDeltaTime, .04f);
+        quitVelocity = (quitVelocity + acceleration * dt) * Mathf.Exp(-8f * dt);
+        var next = position + quitVelocity * dt;
+        var canvasRect = ((RectTransform)menuCanvas.transform).rect;
+        var horizontalLimit = Mathf.Max(0f, (canvasRect.width - rect.width) * .5f - 16f);
+        var bottomLimit = Mathf.Min(quitHome.y, -(canvasRect.height - rect.height) * .5f + 16f);
+        var clamped = new Vector2(
+            Mathf.Clamp(next.x, -horizontalLimit, horizontalLimit),
+            Mathf.Clamp(next.y, bottomLimit, quitHome.y));
+        if (clamped.x != next.x)
+            quitVelocity.x = 0f;
+        if (clamped.y != next.y)
+            quitVelocity.y = 0f;
+        quitButton.anchoredPosition = clamped;
     }
 }

@@ -58,13 +58,6 @@ public sealed class Kamikaze : MonoBehaviour
         if (!IsActive || runAudio == null)
             return;
 
-        if (!GameAudio.EnemyMovementEnabled)
-        {
-            if (runAudio.isPlaying)
-                runAudio.Stop();
-            return;
-        }
-
         runAudio.volume = runVolume * GameAudio.EffectsVolume;
         if (Time.timeScale == 0f || FadeTransition.IsBusy)
         {

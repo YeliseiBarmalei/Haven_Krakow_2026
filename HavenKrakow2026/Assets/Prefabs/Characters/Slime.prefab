@@ -164,7 +164,7 @@ MonoBehaviour:
   idleFramesPerSecond: 8
   flightSprite: {fileID: -5010991357390200157, guid: 61179f6e83af7cd45bba58149e6687bf, type: 3}
   slideSound: {fileID: 8300000, guid: 7a0bde343ce74924a52e03755fbe42fb, type: 3}
-  damageSound: {fileID: 0}
+  damageSound: {fileID: 8300000, guid: 14aba6b5a05a467bac6efdd74e56e42c, type: 3}
   afterimageCount: 14
   afterimageInterval: 0.025
   afterimageLifetime: 0.48

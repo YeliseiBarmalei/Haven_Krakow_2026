@@ -21,12 +21,12 @@ public sealed class LevelBalance : ScriptableObject
     [Min(0f)] public float shieldSuccessCooldown = 3f;
     [Min(0f)] public float shieldPadding = 0f;
     [Min(0f)] public float shieldReturnBoost = 8f;
-    [Min(.01f)] public float shieldRingWidth = .11f;
-    public Color shieldColor = new Color(.25f, .92f, .62f);
-    public Color shieldHitColor = new Color(.77f, 1f, .94f);
-    public Material shieldMaterial;
+    public Sprite shieldSprite;
+    public Color shieldColor = new Color(1f, 1f, 1f, .42f);
+    public Color shieldHitColor = new Color(1f, 1f, 1f, .68f);
 
     [Header("Lightning")]
+    public Sprite lightningWarningIcon;
     public AudioClip lightningSound;
     [Range(0f, 1f)] public float lightningSoundVolume = .25f;
 }

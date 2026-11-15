@@ -16,6 +16,9 @@ public sealed class PauseMenu : MonoBehaviour
     {
         GameAudio.ApplyVolume();
         GameAudio.PlayMusic(backgroundMusic);
+        if (panel == null)
+            return;
+
         foreach (var button in panel.GetComponentsInChildren<UnityEngine.UI.Button>(true))
             button.onClick.AddListener(() => GameAudio.Play(uiClick, .65f));
     }
@@ -54,14 +57,16 @@ public sealed class PauseMenu : MonoBehaviour
 
     private void SetPaused(bool value)
     {
-        if (paused == value)
+        if (paused == value || (value && panel == null))
             return;
 
         if (value)
             previousTimeScale = Time.timeScale;
 
         paused = value;
-        panel.SetActive(value);
-        Time.timeScale = value ? 0f : previousTimeScale;
+        if (value || Time.timeScale == 0f)
+            Time.timeScale = value ? 0f : previousTimeScale;
+        if (panel != null)
+            panel.SetActive(value);
     }
 }

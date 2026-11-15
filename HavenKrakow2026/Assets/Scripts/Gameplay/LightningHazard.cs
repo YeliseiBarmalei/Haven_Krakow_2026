@@ -7,14 +7,17 @@ public sealed class LightningHazard : MonoBehaviour
     private const float Damage = 2f;
 
     private static readonly Color GlowColor = new Color(.32f, .63f, 1f);
+    private static readonly Color WarningColor = new Color(.18f, .79f, .97f);
     private LineRenderer warning;
+    private SpriteRenderer warningIcon;
     private LineRenderer glow;
     private LineRenderer bolt;
     private float age;
     private float radius;
     public bool HitSlime { get; private set; }
 
-    public static LightningHazard Spawn(Transform parent, Vector2 landing, float skyY, float radius, Material material)
+    public static LightningHazard Spawn(Transform parent, Vector2 landing, float skyY, float radius, Material material,
+        Sprite warningSprite)
     {
         var strike = new GameObject("Lightning Strike").AddComponent<LightningHazard>();
         strike.transform.SetParent(parent, false);
@@ -27,8 +30,17 @@ public sealed class LightningHazard : MonoBehaviour
             var angle = i * Mathf.PI * 2f / circle.Length;
             circle[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
         }
-        strike.warning = strike.AddLine("Strike Warning", material, 3, .055f, GlowColor, circle);
+        strike.warning = strike.AddLine("Strike Warning", material, 3, .055f, WarningColor, circle);
         strike.warning.loop = true;
+        if (warningSprite != null)
+        {
+            strike.warningIcon = new GameObject("Lightning Warning Icon").AddComponent<SpriteRenderer>();
+            strike.warningIcon.transform.SetParent(strike.transform, false);
+            strike.warningIcon.sprite = warningSprite;
+            strike.warningIcon.sortingOrder = 9;
+            var size = warningSprite.bounds.size;
+            strike.warningIcon.transform.localScale = Vector3.one * (radius * .8f / Mathf.Max(size.x, size.y));
+        }
 
         var path = new Vector3[10];
         var height = Mathf.Max(1f, skyY - landing.y + .25f);
@@ -51,13 +63,15 @@ public sealed class LightningHazard : MonoBehaviour
         if (age < WarningDuration)
         {
             var pulse = .5f + .5f * Mathf.Sin(age / WarningDuration * Mathf.PI * 7f);
-            SetOpacity(warning, GlowColor, .55f + .45f * pulse);
+            SetOpacity(warning, WarningColor, .55f + .45f * pulse);
             return false;
         }
 
         if (previous < WarningDuration)
         {
             warning.enabled = false;
+            if (warningIcon != null)
+                warningIcon.enabled = false;
             glow.enabled = bolt.enabled = true;
             GameAudio.Play(strikeSound, strikeVolume);
             var reach = radius + slime.Radius;

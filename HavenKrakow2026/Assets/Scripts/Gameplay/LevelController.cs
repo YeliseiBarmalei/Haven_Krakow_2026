@@ -100,8 +100,7 @@ public sealed partial class LevelController : MonoBehaviour
     private float shieldRemaining;
     private float shieldRecharge;
     private bool shieldConnected;
-    private LineRenderer shieldRing;
-    private readonly Vector3[] shieldPoints = new Vector3[64];
+    private SpriteRenderer shieldVisual;
     private readonly Collider2D[] swapOverlaps = new Collider2D[16];
     private readonly ContactFilter2D swapFilter = new ContactFilter2D { useTriggers = false };
     public float ArenaSpeed => slowRemaining > 0f ? .35f : 1f;
@@ -124,7 +123,7 @@ public sealed partial class LevelController : MonoBehaviour
     {
         FitArena();
         previousSlimePosition = slime.Position;
-        CreateShieldRing();
+        CreateShieldVisual();
         slime.PieceCollected += UpdateStatus;
         slime.HealthChanged += OnSlimeHealthChanged;
         grandma.Changed += OnGrandmaHealthChanged;
@@ -236,14 +235,12 @@ public sealed partial class LevelController : MonoBehaviour
             shieldRemaining = balance.shieldDuration;
             shieldConnected = false;
             var bounds = grandma.HitBounds;
-            shieldRing.transform.position = bounds.center;
-            var radius = ShieldRadius(bounds);
-            for (var i = 0; i < shieldPoints.Length; i++)
+            shieldVisual.transform.position = bounds.center;
+            if (shieldVisual.sprite != null)
             {
-                var angle = i * (2f * Mathf.PI / shieldPoints.Length);
-                shieldPoints[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+                var size = shieldVisual.sprite.bounds.size;
+                shieldVisual.transform.localScale = Vector3.one * (2f * ShieldRadius(bounds) / Mathf.Max(size.x, size.y));
             }
-            shieldRing.SetPositions(shieldPoints);
         }
 
         RefreshShield();
@@ -251,24 +248,19 @@ public sealed partial class LevelController : MonoBehaviour
 
     private float ShieldRadius(Bounds bounds) => ((Vector2)bounds.extents).magnitude + balance.shieldPadding;
 
-    private void CreateShieldRing()
+    private void CreateShieldVisual()
     {
-        shieldRing = new GameObject("Slime Parry Shield").AddComponent<LineRenderer>();
-        shieldRing.transform.SetParent(transform, false);
-        shieldRing.useWorldSpace = false;
-        shieldRing.loop = true;
-        shieldRing.positionCount = shieldPoints.Length;
-        shieldRing.sharedMaterial = balance.shieldMaterial != null ? balance.shieldMaterial : grandma.GetComponent<SpriteRenderer>().sharedMaterial;
-        shieldRing.sortingOrder = 6;
-        shieldRing.enabled = false;
+        shieldVisual = new GameObject("Slime Parry Shield").AddComponent<SpriteRenderer>();
+        shieldVisual.transform.SetParent(transform, false);
+        shieldVisual.sprite = balance.shieldSprite;
+        shieldVisual.sortingOrder = 6;
+        shieldVisual.enabled = false;
     }
 
     private void RefreshShield()
     {
-        shieldRing.enabled = shieldRemaining > 0f;
-        shieldRing.startWidth = shieldRing.endWidth = balance.shieldRingWidth;
-        var color = shieldConnected ? balance.shieldHitColor : balance.shieldColor;
-        shieldRing.startColor = shieldRing.endColor = color;
+        shieldVisual.enabled = shieldRemaining > 0f;
+        shieldVisual.color = shieldConnected ? balance.shieldHitColor : balance.shieldColor;
         hud.SetParry(shieldRemaining, shieldRecharge, balance.shieldDuration,
             shieldConnected ? balance.shieldSuccessCooldown : ShieldMissCooldown);
     }
@@ -471,7 +463,8 @@ public sealed partial class LevelController : MonoBehaviour
                 continue;
 
             var sky = arenaCamera.ViewportToWorldPoint(new Vector3(.5f, 1f, arenaCamera.nearClipPlane)).y;
-            lightningStrikes.Add(LightningHazard.Spawn(transform, point, sky, radius, lightningMaterial));
+            lightningStrikes.Add(LightningHazard.Spawn(transform, point, sky, radius, lightningMaterial,
+                balance.lightningWarningIcon));
             lightningTimer = interval * Random.Range(.8f, 1.2f);
             return;
         }

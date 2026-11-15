@@ -167,7 +167,7 @@ MonoBehaviour:
   explosionVisualScale: 1.8
   explosionSound: {fileID: 8300000, guid: 2cec9007c9f34a1d83ea143571484f63, type: 3}
   explosionVolume: 0.3
-  runSound: {fileID: 8300000, guid: 9b054c3e7dd644dd9085d4f203a43beb, type: 3}
+  runSound: {fileID: 8300000, guid: 4ec3b7e8eccf4e06afa3accf2f12e1e8, type: 3}
   runVolume: 0.12
 --- !u!50 &106
 Rigidbody2D:

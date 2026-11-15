@@ -37,6 +37,7 @@ public sealed class ArenaHud : MonoBehaviour
     [SerializeField] private Font eliteBadgeFont;
     [SerializeField] private GameObject skillTooltip;
     [SerializeField] private Text skillTooltipText;
+    [SerializeField] private GameObject pauseOverlay;
     private Text hoveredSkill;
 
     private void UpdateSkillTooltip()
@@ -45,7 +46,8 @@ public sealed class ArenaHud : MonoBehaviour
             return;
 
         Text hovered = null;
-        if (Application.isFocused && Time.timeScale > 0f && !FadeTransition.IsBusy && Mouse.current != null)
+        var canInspect = Time.timeScale > 0f || (pauseOverlay != null && pauseOverlay.activeInHierarchy);
+        if (Application.isFocused && canInspect && !FadeTransition.IsBusy && Mouse.current != null)
         {
             var cursor = Mouse.current.position.ReadValue();
             if (ContainsSkill(slowLabel, cursor))
@@ -57,7 +59,11 @@ public sealed class ArenaHud : MonoBehaviour
         }
 
         if (hovered == hoveredSkill)
+        {
+            if (hovered != null)
+                PositionSkillTooltip(hovered);
             return;
+        }
 
         hoveredSkill = hovered;
         skillTooltip.SetActive(hovered != null);
@@ -72,6 +78,38 @@ public sealed class ArenaHud : MonoBehaviour
             skillTooltipText.text = "<b>E  ·  Parry</b>\nBriefly shield Grandma and reflect incoming bullets. A successful parry recharges faster.";
 
         skillTooltip.transform.SetAsLastSibling();
+        PositionSkillTooltip(hovered);
+    }
+
+    private void PositionSkillTooltip(Text hovered)
+    {
+        const float gap = 10f;
+        const float edgeInset = 4f;
+        var tooltip = (RectTransform)skillTooltip.transform;
+        var root = (RectTransform)tooltip.parent;
+        var card = (RectTransform)hovered.transform.parent;
+        var leftCard = (RectTransform)slowLabel.transform.parent;
+        var rightCard = (RectTransform)parryLabel.transform.parent;
+        var rowLeft = root.InverseTransformPoint(leftCard.TransformPoint(leftCard.rect.min)).x;
+        var rowRight = root.InverseTransformPoint(rightCard.TransformPoint(rightCard.rect.max)).x;
+        var centerY = root.InverseTransformPoint(card.TransformPoint(card.rect.center)).y;
+
+        var left = rowLeft - gap - tooltip.rect.xMax;
+        var right = rowRight + gap - tooltip.rect.xMin;
+        var minX = root.rect.xMin + edgeInset - tooltip.rect.xMin;
+        var maxX = root.rect.xMax - edgeInset - tooltip.rect.xMax;
+        var preferLeft = hovered == slowLabel;
+        var x = preferLeft ? left : right;
+        if (preferLeft && left < minX && right <= maxX)
+            x = right;
+        else if (!preferLeft && right > maxX && left >= minX)
+            x = left;
+
+        tooltip.localPosition = new Vector3(
+            Mathf.Clamp(x, minX, maxX),
+            Mathf.Clamp(centerY, root.rect.yMin + edgeInset - tooltip.rect.yMin,
+                root.rect.yMax - edgeInset - tooltip.rect.yMax),
+            tooltip.localPosition.z);
     }
 
     private static bool ContainsSkill(Text label, Vector2 cursor)
@@ -93,22 +131,22 @@ public sealed class ArenaHud : MonoBehaviour
         foreach (var edge in slowEdges)
             edge.canvasRenderer.SetAlpha(strength);
 
-        slowLabel.text = active ? $"{remaining:0.0}s" :
-            recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : "Space";
+        slowLabel.text = active ? $"Space  {remaining:0.0}s" :
+            recharge > 0f ? $"Space  {Mathf.CeilToInt(recharge)}s" : "Space";
         var fraction = active ? remaining / duration : cooldown > 0f ? 1f - recharge / cooldown : 1f;
         slowBar.fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
     }
 
     public void SetSwap(float recharge, float cooldown, bool hasTarget)
     {
-        swapLabel.text = recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : hasTarget ? "Q" : "NO SHOT";
+        swapLabel.text = recharge > 0f ? $"Q  {Mathf.CeilToInt(recharge)}s" : "Q";
         swapBar.fill.anchorMax = new Vector2(recharge > 0f ? Mathf.Clamp01(1f - recharge / cooldown) : hasTarget ? 1f : 0f, 1f);
     }
 
     public void SetParry(float remaining, float recharge, float duration, float cooldown)
     {
-        parryLabel.text = remaining > 0f ? "ACTIVE" :
-            recharge > 0f ? $"{Mathf.CeilToInt(recharge)}s" : "E";
+        parryLabel.text = remaining > 0f ? $"E  {remaining:0.0}s" :
+            recharge > 0f ? $"E  {Mathf.CeilToInt(recharge)}s" : "E";
         var fraction = remaining > 0f ? remaining / duration : cooldown > 0f ? 1f - recharge / cooldown : 1f;
         parryBar.fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
     }

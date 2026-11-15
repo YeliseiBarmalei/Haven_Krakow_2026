@@ -190,7 +190,8 @@ public sealed partial class LevelController
         if (tutorialLightning == null)
         {
             var sky = arenaCamera.ViewportToWorldPoint(new Vector3(.5f, 1f, arenaCamera.nearClipPlane)).y;
-            tutorialLightning = LightningHazard.Spawn(transform, slime.Position, sky, lightningRadius, lightningMaterial);
+            tutorialLightning = LightningHazard.Spawn(transform, slime.Position, sky, lightningRadius, lightningMaterial,
+                balance.lightningWarningIcon);
         }
 
         if (!tutorialLightning.Tick(step, slime, balance.lightningSound, balance.lightningSoundVolume, dealDamage: false))
