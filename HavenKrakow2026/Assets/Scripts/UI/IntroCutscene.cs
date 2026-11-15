@@ -8,6 +8,7 @@ public sealed class IntroCutscene : MonoBehaviour
     [SerializeField, TextArea] private string[] lines;
     [SerializeField, Min(1f)] private float charactersPerSecond = 38f;
     [SerializeField] private string nextScene = "LevelSelect";
+    [SerializeField] private string firstRunScene = "Tutorial";
     [SerializeField] private AudioClip uiClick;
     [SerializeField] private AudioClip backgroundMusic;
 
@@ -42,7 +43,7 @@ public sealed class IntroCutscene : MonoBehaviour
         GameAudio.Play(uiClick, .65f);
         if (lines.Length == 0)
         {
-            FadeTransition.Load(nextScene);
+            FinishIntro();
             return;
         }
 
@@ -55,7 +56,7 @@ public sealed class IntroCutscene : MonoBehaviour
         }
 
         if (lineIndex == lines.Length - 1)
-            FadeTransition.Load(nextScene);
+            FinishIntro();
         else
         {
             lineIndex++;
@@ -69,8 +70,11 @@ public sealed class IntroCutscene : MonoBehaviour
             return;
 
         GameAudio.Play(uiClick, .65f);
-        FadeTransition.Load(nextScene);
+        FinishIntro();
     }
+
+    private void FinishIntro() =>
+        FadeTransition.Load(MainMenu.HasCompletedTutorial ? nextScene : firstRunScene);
 
     private void ShowLine()
     {

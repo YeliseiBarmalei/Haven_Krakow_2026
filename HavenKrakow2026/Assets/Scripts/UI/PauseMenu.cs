@@ -39,6 +39,15 @@ public sealed class PauseMenu : MonoBehaviour
             SetPaused(false);
     }
 
+    public void Pause()
+    {
+        if (FadeTransition.IsBusy || paused || panel == null || Time.timeScale <= 0f)
+            return;
+
+        GameAudio.Play(uiClick, .65f);
+        SetPaused(true);
+    }
+
     public void Resume()
     {
         if (!FadeTransition.IsBusy)

@@ -3,7 +3,7 @@ using UnityEngine.UI;
 
 public sealed partial class LevelController
 {
-    private enum TutorialStep { None, Launch, Reflect, SlowMotion, Swap, Shield, Collect, Upgrade, Lightning, Ram }
+    private enum TutorialStep { None, Launch, Reflect, SlowMotion, Swap, Shield, HealSlime, HealGrandma, Collect, Upgrade, Lightning, Ram }
 
     [SerializeField] private Text tutorialNotice;
     [SerializeField] private string tutorialExitScene = "Level01";
@@ -12,6 +12,7 @@ public sealed partial class LevelController
     private Shooter tutorialShooter;
     private bool tutorialReflected;
     private bool tutorialUsedSlowMotion;
+    private bool tutorialMovedDuringSlowMotion;
     private bool tutorialShieldReady;
     private bool tutorialSwapped;
     private float tutorialWait;
@@ -36,20 +37,28 @@ public sealed partial class LevelController
         tutorialWait = tutorialShooter.PracticeWarningDuration;
         slime.CanDamageGrandma = false;
         slime.CanLaunch = step != TutorialStep.Upgrade;
+        hud.SetPracticeSkills(step == TutorialStep.SlowMotion, step == TutorialStep.Swap, step == TutorialStep.Shield);
         tutorialNotice.enabled = true;
         ShowTutorialPrompt(step switch
         {
-            TutorialStep.Launch => "Drag with left mouse and release to launch.",
+            TutorialStep.Launch => "Hold left mouse and drag toward your target. Release to launch.",
             TutorialStep.Reflect => "Slide into the incoming bullet and send it back into the shooter.",
-            TutorialStep.SlowMotion => "Press Space, then try moving while the bullets slow down.",
-            TutorialStep.Swap => "Press Q when a bullet is on the arena to swap places with it.",
+            TutorialStep.SlowMotion => "Press Space to activate Slime-Devistan, then move while the bullets slow down.",
+            TutorialStep.Swap => "When the Swap bar fills, press Q to trade places with a bullet.",
             TutorialStep.Shield => "Watch the bullet flying toward Grandma.",
-            TutorialStep.Collect => $"Collect {UpgradeCost} slime pieces after they land. Each upgrade costs one more piece.",
+            TutorialStep.HealSlime => "Pick up the water bottle to restore 1 HP to Slime.",
+            TutorialStep.HealGrandma => "Pick up the medkit with Slime to restore 1 HP to Grandma.",
+            TutorialStep.Collect => $"Collect {UpgradeCost} cakes after they land. Each upgrade costs one more cake.",
             TutorialStep.Upgrade => "Choose your first upgrade.",
             TutorialStep.Lightning => "Launch out of the warning circle before lightning strikes.",
-            TutorialStep.Ram => "Pull the launch arrow to its limit, then ram the TNT runner.",
+            TutorialStep.Ram => "Drag until the arrowhead turns white, then launch into the TNT runner.",
             _ => string.Empty
         });
+
+        if (step == TutorialStep.HealSlime)
+            slime.TakeHazardDamage(Mathf.Min(1f, slime.Health * .5f));
+        else if (step == TutorialStep.HealGrandma)
+            grandma.TakeHit(Mathf.Min(1f, grandma.Current * .5f));
 
         if (step == TutorialStep.Collect)
         {
@@ -88,11 +97,20 @@ public sealed partial class LevelController
                     tutorialUsedSlowMotion = true;
                     ShowTutorialPrompt("Move with left mouse while time is slow.");
                 }
-                else if (tutorialUsedSlowMotion && slowRemaining <= 0f)
+                if (slowRemaining > 0f && slime.IsInFlight)
+                    tutorialMovedDuringSlowMotion = true;
+
+                if (tutorialUsedSlowMotion && slowRemaining <= 0f)
                 {
                     slowRecharge = 0f;
                     hud.SetSlowMotion(0f, 0f, balance.slowDuration, SlowCooldown);
-                    BeginTutorialStep(TutorialStep.Swap);
+                    if (tutorialMovedDuringSlowMotion)
+                        BeginTutorialStep(TutorialStep.Swap);
+                    else
+                    {
+                        tutorialUsedSlowMotion = false;
+                        ShowTutorialPrompt("Press Space again, then launch before Slime-Devistan ends.");
+                    }
                 }
                 break;
             case TutorialStep.Swap:
@@ -124,14 +142,36 @@ public sealed partial class LevelController
                     shieldRemaining = shieldRecharge = 0f;
                     RefreshShield();
                     tutorialShooter.gameObject.SetActive(false);
-                    BeginTutorialStep(TutorialStep.Collect);
+                    BeginTutorialStep(TutorialStep.HealSlime);
                 }
+                break;
+            case TutorialStep.HealSlime:
+                if (slime.Health >= slime.MaxHealth)
+                    BeginTutorialStep(TutorialStep.HealGrandma);
+                else if (healingDrop == null)
+                    DropTutorialHealingItem(false);
+                break;
+            case TutorialStep.HealGrandma:
+                if (grandma.Current >= grandma.Max)
+                    BeginTutorialStep(TutorialStep.Collect);
+                else if (healingDrop == null)
+                    DropTutorialHealingItem(true);
                 break;
             case TutorialStep.Collect when slime.Pieces >= UpgradeCost:
                 BeginTutorialStep(TutorialStep.Upgrade);
                 OpenUpgradeMenu();
                 break;
         }
+    }
+
+    private void DropTutorialHealingItem(bool forGrandma)
+    {
+        var bounds = ArenaBounds;
+        var distance = Mathf.Max(1.45f, slime.Radius + .65f);
+        var direction = slime.Position.y > tutorialStart.y ? -1f : 1f;
+        var landing = tutorialStart + Vector2.up * (distance * direction);
+        landing.y = Mathf.Clamp(landing.y, bounds.min.y + .65f, bounds.max.y - .65f);
+        SpawnHealingDrop(landing, forGrandma);
     }
 
     private void TickTutorial()
@@ -221,7 +261,7 @@ public sealed partial class LevelController
         if (waveKamikazeDefeats > 0)
             CompleteTutorial();
         else
-            ShowTutorialPrompt("Try again. Pull the arrow all the way back before releasing.");
+            ShowTutorialPrompt("Try again. Drag farther until the arrowhead turns white.");
     }
 
     private void ClearTutorialShots()

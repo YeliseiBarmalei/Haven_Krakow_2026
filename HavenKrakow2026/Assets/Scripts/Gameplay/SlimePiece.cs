@@ -72,7 +72,15 @@ public sealed class SlimePiece : MonoBehaviour
         }
     }
 
-    private void OnTriggerEnter2D(Collider2D other)
+    private void OnTriggerEnter2D(Collider2D other) => TryCollect(other);
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        if (falling)
+            TryCollect(other);
+    }
+
+    private void TryCollect(Collider2D other)
     {
         if (collected || !other.TryGetComponent<SlimeController>(out var slime) || !slime.CanLaunch)
             return;

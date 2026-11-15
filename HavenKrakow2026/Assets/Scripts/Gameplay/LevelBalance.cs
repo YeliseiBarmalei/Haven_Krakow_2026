@@ -7,7 +7,7 @@ public sealed class LevelBalance : ScriptableObject
     [Min(1f)] public float pieceInterval = 10f;
     [Min(1)] public int startingUpgradeCost = 2;
 
-    [Header("Slow Motion")]
+    [Header("Slime-Devistan")]
     [Min(.01f)] public float slowDuration = 3f;
     [Min(.01f)] public float slowCooldown = 18f;
 

@@ -25,6 +25,7 @@ public sealed class Kamikaze : MonoBehaviour
     private float walkFrame;
 
     public bool IsActive { get; private set; }
+    public Bounds VisualBounds => visual.bounds;
 
     private void Awake()
     {

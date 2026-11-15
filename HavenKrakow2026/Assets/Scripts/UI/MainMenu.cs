@@ -5,6 +5,7 @@ using UnityEngine.UI;
 public sealed class MainMenu : MonoBehaviour
 {
     private const string TutorialSeenKey = "Tutorial.PracticeCompleted";
+    public static bool HasCompletedTutorial => PlayerPrefs.GetInt(TutorialSeenKey) == 1;
     [System.Serializable]
     private sealed class LevelEntry
     {
@@ -26,6 +27,7 @@ public sealed class MainMenu : MonoBehaviour
     [SerializeField] private RectTransform quitButton;
     [SerializeField] private GameObject menuCard;
     [SerializeField] private GameObject settingsCard;
+    [SerializeField] private GameObject resetSavesButton;
 
     private Vector2 quitHome;
     private Vector2 quitVelocity;
@@ -62,16 +64,34 @@ public sealed class MainMenu : MonoBehaviour
 
         menuCard.SetActive(!open);
         settingsCard.SetActive(open);
+        if (quitButton != null)
+        {
+            quitButton.anchoredPosition = quitHome;
+            quitVelocity = Vector2.zero;
+        }
+        if (resetSavesButton != null)
+            resetSavesButton.SetActive(!open);
     }
 
     public void Back() => FadeTransition.Load(mainMenuScene);
+
+    public void ResetSaves()
+    {
+        if (FadeTransition.IsBusy)
+            return;
+
+        PlayerPrefs.DeleteAll();
+        PlayerPrefs.Save();
+        GameAudio.ApplyVolume();
+        FadeTransition.Load(mainMenuScene);
+    }
 
     private void OpenLevel(LevelEntry level)
     {
         if (FadeTransition.IsBusy || !IsAvailable(level))
             return;
 
-        if (level.scene == tutorialLevel && PlayerPrefs.GetInt(TutorialSeenKey) == 0)
+        if (level.scene == tutorialLevel && !HasCompletedTutorial)
         {
             Tutorial();
             return;
@@ -125,11 +145,16 @@ public sealed class MainMenu : MonoBehaviour
         var dt = Mathf.Min(Time.unscaledDeltaTime, .04f);
         quitVelocity = (quitVelocity + acceleration * dt) * Mathf.Exp(-8f * dt);
         var next = position + quitVelocity * dt;
-        var canvasRect = ((RectTransform)menuCanvas.transform).rect;
-        var horizontalLimit = Mathf.Max(0f, (canvasRect.width - rect.width) * .5f - 16f);
-        var bottomLimit = Mathf.Min(quitHome.y, -(canvasRect.height - rect.height) * .5f + 16f);
+        var canvas = (RectTransform)menuCanvas.transform;
+        var parent = (RectTransform)quitButton.parent;
+        var min = parent.InverseTransformPoint(canvas.TransformPoint(canvas.rect.min));
+        var max = parent.InverseTransformPoint(canvas.TransformPoint(canvas.rect.max));
+        var anchor = (Vector2)quitButton.localPosition - position;
+        var leftLimit = Mathf.Min(quitHome.x, min.x - anchor.x - rect.xMin + 16f);
+        var rightLimit = Mathf.Max(quitHome.x, max.x - anchor.x - rect.xMax - 16f);
+        var bottomLimit = Mathf.Min(quitHome.y, min.y - anchor.y - rect.yMin + 16f);
         var clamped = new Vector2(
-            Mathf.Clamp(next.x, -horizontalLimit, horizontalLimit),
+            Mathf.Clamp(next.x, leftLimit, rightLimit),
             Mathf.Clamp(next.y, bottomLimit, quitHome.y));
         if (clamped.x != next.x)
             quitVelocity.x = 0f;

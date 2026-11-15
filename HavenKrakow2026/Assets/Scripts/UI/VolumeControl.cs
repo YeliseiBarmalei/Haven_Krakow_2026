@@ -37,7 +37,8 @@ public sealed class VolumeControl : MonoBehaviour, IPointerUpHandler
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        GameAudio.Play(previewClip, .65f);
+        if (channel != Channel.Music && eventData.button == PointerEventData.InputButton.Left)
+            GameAudio.Play(previewClip, .65f);
     }
 
     private void SetVolume(float value)

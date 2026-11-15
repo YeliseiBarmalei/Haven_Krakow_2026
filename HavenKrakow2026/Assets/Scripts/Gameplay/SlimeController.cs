@@ -27,7 +27,7 @@ public sealed class SlimeController : MonoBehaviour
     [SerializeField] private AudioClip slideSound;
     [SerializeField] private AudioClip damageSound;
 
-    [Header("Slow Motion Afterimages")]
+    [Header("Slime-Devistan Afterimages")]
     [SerializeField, Range(0, 24)] private int afterimageCount = 14;
     [SerializeField, Min(.01f)] private float afterimageInterval = .025f;
     [SerializeField, Min(.01f)] private float afterimageLifetime = .48f;
@@ -81,6 +81,8 @@ public sealed class SlimeController : MonoBehaviour
     public bool CanRam => CanLaunch && launched && fullPowerLaunch;
     public int MaxHealth => maxHealth;
     public bool CanLaunch { get; set; } = true;
+    public bool CanTakeShooterContactDamage { get; set; } = true;
+    public RectTransform PauseButton { private get; set; }
     public bool CanDamageGrandma { get; set; } = true;
     public event System.Action PieceCollected;
     public event System.Action HealthChanged;
@@ -213,7 +215,7 @@ public sealed class SlimeController : MonoBehaviour
 
     private void CreateAfterimages()
     {
-        afterimageRoot = new GameObject("Slow Motion Afterimages").transform;
+        afterimageRoot = new GameObject("Slime-Devistan Afterimages").transform;
         afterimages = new Afterimage[afterimageCount];
         for (var i = 0; i < afterimages.Length; i++)
         {
@@ -302,6 +304,10 @@ public sealed class SlimeController : MonoBehaviour
         var cursor = mouse.position.ReadValue();
         if (mouse.leftButton.wasPressedThisFrame)
         {
+            if (PauseButton != null && PauseButton.gameObject.activeInHierarchy &&
+                RectTransformUtility.RectangleContainsScreenPoint(PauseButton, cursor))
+                return;
+
             aiming = true;
             dragStart = cursor;
         }
@@ -312,13 +318,14 @@ public sealed class SlimeController : MonoBehaviour
         var worldUnitsPerPixel = 2f * view.orthographicSize / view.pixelHeight;
         var rawPull = (cursor - dragStart) * worldUnitsPerPixel;
         var pull = Vector2.ClampMagnitude(rawPull, dragLimit);
+        var fullPower = rawPull.sqrMagnitude >= dragLimit * dragLimit;
         if (mouse.leftButton.wasReleasedThisFrame)
         {
             if (pull.sqrMagnitude > .01f)
             {
                 body.linearVelocity = pull * (launchSpeed / dragLimit);
                 launched = true;
-                fullPowerLaunch = rawPull.sqrMagnitude >= dragLimit * dragLimit;
+                fullPowerLaunch = fullPower;
                 if (GameAudio.PlayerMovementEnabled)
                     GameAudio.Play(slideSound, .68f);
                 visual.color = flightTint;
@@ -335,7 +342,7 @@ public sealed class SlimeController : MonoBehaviour
             return;
         }
 
-        ShowAim(pull);
+        ShowAim(pull, fullPower);
     }
 
     private void UpdateIdleSprite()
@@ -397,7 +404,7 @@ public sealed class SlimeController : MonoBehaviour
         if (!collision.collider.TryGetComponent<Shooter>(out _))
             return false;
 
-        if (CanLaunch && !launched && Time.time >= nextHitTime)
+        if (CanTakeShooterContactDamage && CanLaunch && !launched && Time.time >= nextHitTime)
         {
             nextHitTime = Time.time + hitCooldown;
             TakeHit();
@@ -442,7 +449,7 @@ public sealed class SlimeController : MonoBehaviour
         return true;
     }
 
-    private void ShowAim(Vector2 pull)
+    private void ShowAim(Vector2 pull, bool fullPower)
     {
         var length = pull.magnitude;
         var direction = pull.normalized;
@@ -470,9 +477,11 @@ public sealed class SlimeController : MonoBehaviour
             tick.transform.localScale = new Vector3(width / length, 1.65f, 1f);
         }
 
-        aimHeadVisual.color = AimColors[Mathf.Min((int)(length / dragLimit * AimColors.Length), AimColors.Length - 1)];
+        var colorIndex = Mathf.Min((int)(length / dragLimit * AimColors.Length), AimColors.Length - 1);
+        aimHeadVisual.color = fullPower ? Color.white : AimColors[colorIndex];
         aimHead.SetPositionAndRotation(start + pull, rotation * Quaternion.Euler(0, 0, -90));
-        aimHead.localScale = new Vector3(.28f / scale, .29f / scale, 1f);
+        var headSize = fullPower ? 1.25f : 1f;
+        aimHead.localScale = new Vector3(.28f * headSize / scale, .29f * headSize / scale, 1f);
         aimShaft.gameObject.SetActive(true);
         aimHead.gameObject.SetActive(true);
         ShowStopMarker(pull);

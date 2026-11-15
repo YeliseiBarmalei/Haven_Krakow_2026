@@ -12,12 +12,14 @@ public sealed class UpgradeMenu : MonoBehaviour
     private Action<Upgrade> onChoose;
     private float previousTimeScale;
 
-    public void Open(int level, int cooldownUpgrades, int cooldownLimit, Action<Upgrade> choose)
+    public void Open(int level, int cooldownUpgrades, int cooldownLimit,
+        float slowAndSwapReduction, float parryMissReduction, Action<Upgrade> choose)
     {
         title.text = $"Level {level}   |   Choose an upgrade";
         cooldownButton.interactable = cooldownUpgrades < cooldownLimit;
         cooldownLabel.text = cooldownButton.interactable
-            ? $"Shorter Cooldowns  ({cooldownUpgrades}/{cooldownLimit})"
+            ? $"Shorter Cooldowns  ({cooldownUpgrades}/{cooldownLimit})\n" +
+              $"<size=15>Space / Q -{slowAndSwapReduction:0.#}s  ·  Missed parry -{parryMissReduction:0.#}s</size>"
             : "Shorter Cooldowns  (maxed)";
         onChoose = choose;
         previousTimeScale = Time.timeScale;

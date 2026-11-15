@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public sealed class ArenaHud : MonoBehaviour
 {
+    private const float FadeSpeed = 6f;
+    private const float LockedSkillAlpha = .62f;
+
     [System.Serializable]
     private sealed class Bar
     {
@@ -24,7 +27,29 @@ public sealed class ArenaHud : MonoBehaviour
         public RectTransform Badge;
     }
 
+    private sealed class FadePanel
+    {
+        public readonly RectTransform Rect;
+        public readonly CanvasGroup Group;
+        public readonly float BaseAlpha;
+        public Rect ScreenRect;
+        public bool Occluded;
+        public bool Available = true;
+
+        public FadePanel(Transform panel)
+        {
+            Rect = (RectTransform)panel;
+            Group = Rect.GetComponent<CanvasGroup>();
+            if (Group == null)
+                Group = Rect.gameObject.AddComponent<CanvasGroup>();
+            BaseAlpha = Group.alpha;
+        }
+
+        public bool Overlaps(Rect rect) => ScreenRect.width > 0f && ScreenRect.Overlaps(rect);
+    }
+
     private readonly List<EnemyBar> enemyBars = new();
+    private readonly List<Kamikaze> runners = new();
     private readonly Vector3[] panelCorners = new Vector3[4];
     [SerializeField] private Camera arenaCamera;
     [SerializeField] private Bar enemyBarTemplate;
@@ -38,7 +63,36 @@ public sealed class ArenaHud : MonoBehaviour
     [SerializeField] private GameObject skillTooltip;
     [SerializeField] private Text skillTooltipText;
     [SerializeField] private GameObject pauseOverlay;
+    [SerializeField] private RectTransform pauseButton;
+    [SerializeField, Range(.1f, .95f)] private float occludedPanelAlpha = .45f;
     private Text hoveredSkill;
+    private FadePanel[] fadePanels;
+    private FadePanel slowPanel, swapPanel, parryPanel;
+
+    public RectTransform PauseButton => pauseButton;
+
+    private void Awake()
+    {
+        slowPanel = new FadePanel(slowLabel.transform.parent);
+        swapPanel = new FadePanel(swapLabel.transform.parent);
+        parryPanel = new FadePanel(parryLabel.transform.parent);
+        fadePanels = new[]
+        {
+            new FadePanel(slimeHealth.track.parent),
+            new FadePanel(grandmaHealth.track.parent),
+            new FadePanel(waveValue.transform.parent),
+            slowPanel,
+            swapPanel,
+            parryPanel
+        };
+    }
+
+    public void SetPracticeSkills(bool slowAvailable, bool swapAvailable, bool parryAvailable)
+    {
+        slowPanel.Available = slowAvailable;
+        swapPanel.Available = swapAvailable;
+        parryPanel.Available = parryAvailable;
+    }
 
     private void UpdateSkillTooltip()
     {
@@ -71,7 +125,7 @@ public sealed class ArenaHud : MonoBehaviour
             return;
 
         if (hovered == slowLabel)
-            skillTooltipText.text = "<b>Space  ·  Slow Motion</b>\nSlows bullets and enemies while you move at full speed.";
+            skillTooltipText.text = "<b>Space  ·  Slime-Devistan</b>\nSlows bullets and enemies while you move at full speed.";
         else if (hovered == swapLabel)
             skillTooltipText.text = "<b>Q  ·  Swap</b>\nTrade places with the nearest eligible bullet. It keeps flying in the same direction.";
         else
@@ -139,7 +193,7 @@ public sealed class ArenaHud : MonoBehaviour
 
     public void SetSwap(float recharge, float cooldown, bool hasTarget)
     {
-        swapLabel.text = recharge > 0f ? $"Q  {Mathf.CeilToInt(recharge)}s" : "Q";
+        swapLabel.text = recharge > 0f ? $"Q  {Mathf.CeilToInt(recharge)}s" : hasTarget ? "Q" : "Q  ·  No shot";
         swapBar.fill.anchorMax = new Vector2(recharge > 0f ? Mathf.Clamp01(1f - recharge / cooldown) : hasTarget ? 1f : 0f, 1f);
     }
 
@@ -159,7 +213,7 @@ public sealed class ArenaHud : MonoBehaviour
         progress.Set(pieces, requiredPieces);
         slimeValue.text = $"{slimeHp:0.#}/{slimeMax} HP";
         grandmaValue.text = $"{grandmaHp:0.#}/{grandmaMax} HP";
-        progressValue.text = $"Lv. {level}    Pieces {pieces}/{requiredPieces}    Return dmg {damage:0.#}";
+        progressValue.text = $"Lv. {level}    Cakes {pieces}/{requiredPieces}    Return dmg {damage:0.#}";
         waveValue.text = $"WAVE {wave} / {totalWaves}";
     }
 
@@ -195,9 +249,13 @@ public sealed class ArenaHud : MonoBehaviour
         enemyBars.Clear();
     }
 
-    public Rect SlimePanelScreenRect()
+    public void TrackEnemy(Kamikaze runner) => runners.Add(runner);
+
+    public Rect SlimePanelScreenRect() => PanelScreenRect((RectTransform)slimeHealth.track.parent);
+
+    private Rect PanelScreenRect(RectTransform panel)
     {
-        ((RectTransform)slimeHealth.track.parent).GetWorldCorners(panelCorners);
+        panel.GetWorldCorners(panelCorners);
         var min = RectTransformUtility.WorldToScreenPoint(null, panelCorners[0]);
         var max = RectTransformUtility.WorldToScreenPoint(null, panelCorners[2]);
         return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
@@ -207,7 +265,23 @@ public sealed class ArenaHud : MonoBehaviour
     {
         UpdateSkillTooltip();
         var root = (RectTransform)transform;
-        var panel = SlimePanelScreenRect();
+        foreach (var panel in fadePanels)
+        {
+            panel.ScreenRect = panel.Rect.gameObject.activeInHierarchy
+                ? PanelScreenRect(panel.Rect)
+                : Rect.zero;
+            panel.Occluded = false;
+        }
+
+        for (var i = runners.Count - 1; i >= 0; i--)
+        {
+            var runner = runners[i];
+            if (runner == null || !runner.IsActive)
+                runners.RemoveAt(i);
+            else
+                MarkOccludedPanels(runner.VisualBounds);
+        }
+
         for (var i = enemyBars.Count - 1; i >= 0; i--)
         {
             var entry = enemyBars[i];
@@ -221,6 +295,7 @@ public sealed class ArenaHud : MonoBehaviour
             var track = entry.Bar.track;
             var actor = entry.Shooter.Health;
             var sprite = entry.Shooter.VisualBounds;
+            MarkOccludedPanels(sprite);
             var world = new Vector3(sprite.center.x, sprite.max.y + .12f, sprite.center.z);
             var screen = arenaCamera.WorldToScreenPoint(world);
             var visible = entry.Shooter.CanBeHit && screen.z > 0f && arenaCamera.pixelRect.Contains(screen);
@@ -233,8 +308,14 @@ public sealed class ArenaHud : MonoBehaviour
             RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, null, out var point);
             var halfWidth = track.sizeDelta.x * .5f + 4f;
             var halfHeight = track.sizeDelta.y * .5f + 4f;
+            var leftInset = halfWidth;
+            if (entry.Badge != null)
+            {
+                leftInset += -entry.Badge.anchoredPosition.x - entry.Badge.rect.xMin;
+                halfHeight = Mathf.Max(halfHeight, entry.Badge.rect.height * .5f + 4f);
+            }
             track.anchoredPosition = new Vector2(
-                Mathf.Clamp(point.x, root.rect.xMin + halfWidth, root.rect.xMax - halfWidth),
+                Mathf.Clamp(point.x, root.rect.xMin + leftInset, root.rect.xMax - halfWidth),
                 Mathf.Clamp(point.y, root.rect.yMin + halfHeight, root.rect.yMax - halfHeight));
             track.GetWorldCorners(panelCorners);
             var min = RectTransformUtility.WorldToScreenPoint(null, panelCorners[0]);
@@ -245,8 +326,36 @@ public sealed class ArenaHud : MonoBehaviour
                 min = Vector2.Min(min, RectTransformUtility.WorldToScreenPoint(null, panelCorners[0]));
                 max = Vector2.Max(max, RectTransformUtility.WorldToScreenPoint(null, panelCorners[2]));
             }
-            track.gameObject.SetActive(!panel.Overlaps(Rect.MinMaxRect(min.x, min.y, max.x, max.y)));
+            var barRect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+            var overlapsPanel = false;
+            foreach (var panel in fadePanels)
+                overlapsPanel |= panel.Overlaps(barRect);
+            track.gameObject.SetActive(!overlapsPanel);
             entry.Bar.Set(actor.Current, actor.Max);
+        }
+
+        foreach (var panel in fadePanels)
+        {
+            var visibility = panel.Available ? 1f : LockedSkillAlpha;
+            if (panel.Occluded)
+                visibility = Mathf.Min(visibility, occludedPanelAlpha);
+            panel.Group.alpha = Mathf.MoveTowards(panel.Group.alpha, panel.BaseAlpha * visibility,
+                FadeSpeed * Time.unscaledDeltaTime);
+        }
+    }
+
+    private void MarkOccludedPanels(Bounds sprite)
+    {
+        var min = arenaCamera.WorldToScreenPoint(sprite.min);
+        var max = arenaCamera.WorldToScreenPoint(sprite.max);
+        if (min.z <= 0f || max.z <= 0f)
+            return;
+
+        var screenBounds = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        foreach (var panel in fadePanels)
+        {
+            if (panel.Overlaps(screenBounds))
+                panel.Occluded = true;
         }
     }
 }

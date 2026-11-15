@@ -122,6 +122,7 @@ public sealed partial class LevelController : MonoBehaviour
     private void Start()
     {
         FitArena();
+        slime.PauseButton = hud.PauseButton;
         previousSlimePosition = slime.Position;
         CreateShieldVisual();
         slime.PieceCollected += UpdateStatus;
@@ -132,6 +133,7 @@ public sealed partial class LevelController : MonoBehaviour
         Canvas.ForceUpdateCanvases();
         if (tutorialNotice != null)
         {
+            slime.CanTakeShooterContactDamage = false;
             tutorialStart = slime.Position;
             SpawnTutorialShooter();
             BeginTutorialStep(TutorialStep.Launch);
@@ -172,7 +174,8 @@ public sealed partial class LevelController : MonoBehaviour
     private void OpenUpgradeMenu()
     {
         GameAudio.Play(levelUpSound, .85f);
-        upgradeMenu.Open(slimeLevel + 1, cooldownUpgrades, CooldownUpgradeLimit, ChooseUpgrade);
+        upgradeMenu.Open(slimeLevel + 1, cooldownUpgrades, CooldownUpgradeLimit,
+            SlowAndSwapReduction, ParryMissReduction, ChooseUpgrade);
     }
 
     private void UpdateSlowMotion()
@@ -477,12 +480,29 @@ public sealed partial class LevelController : MonoBehaviour
             return;
 
         var bandage = grandma.Current < grandma.Max && (slime.Health == slime.MaxHealth || Random.value < .5f);
-        var bounds = arenaBounds.bounds;
-        var landing = new Vector2(Random.Range(bounds.min.x + 1.35f, bounds.max.x - 1.35f),
-            Random.Range(bounds.min.y + 1.35f, bounds.max.y - 1.35f));
+        var bounds = ArenaBounds;
+        var grandmaBounds = grandma.HitBounds;
+        var clearance = slime.Radius + .2f;
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            const float margin = 1.35f;
+            var landing = new Vector2(Random.Range(bounds.min.x + margin, bounds.max.x - margin),
+                Random.Range(bounds.min.y + margin, bounds.max.y - margin));
+            var pickupPoint = new Vector3(landing.x, landing.y, grandmaBounds.center.z);
+            if (grandmaBounds.SqrDistance(pickupPoint) <= clearance * clearance)
+                continue;
+
+            SpawnHealingDrop(landing, bandage);
+            return;
+        }
+    }
+
+    private void SpawnHealingDrop(Vector2 landing, bool bandage)
+    {
+        var bounds = ArenaBounds;
         var start = new Vector2(landing.x, bounds.max.y + 1f);
         healingDrop = Instantiate(piecePrefab, start, Quaternion.identity);
-        healingDrop.name = bandage ? "Bandage" : "Healing Slime";
+        healingDrop.name = bandage ? "Medkit" : "Water Bottle";
         healingDrop.DropAt(landing, bandage ? bandageSprite : slimeHealSprite, bandage ? grandma : null, this);
     }
 
@@ -576,6 +596,7 @@ public sealed partial class LevelController : MonoBehaviour
         entry[axis] = OffscreenEntryCoordinate(runner.GetComponent<SpriteRenderer>(), axis, Mathf.Sign(offset[axis]));
         runner.Begin(entry, grandma, this);
         kamikazes.Add(runner);
+        hud.TrackEnemy(runner);
     }
 
     public void RegisterKamikazeDefeat()
@@ -869,6 +890,9 @@ public sealed partial class LevelController : MonoBehaviour
 
     private void Finish(string message, bool victory = false)
     {
+        if (finished)
+            return;
+
         finished = true;
         won = victory;
         if (victory && !string.IsNullOrEmpty(nextLevelScene))
@@ -878,6 +902,7 @@ public sealed partial class LevelController : MonoBehaviour
         slowRemaining = 0f;
         GameAudio.SetPlaybackSpeed(1f);
         hud.SetSlowMotion(0f, slowRecharge, balance.slowDuration, SlowCooldown);
+        hud.SetSwap(0f, SwapCooldown, false);
         slime.SetSlowMotionAfterimages(false);
         waveNotice.enabled = false;
         slime.CanLaunch = false;
