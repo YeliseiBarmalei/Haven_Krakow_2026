@@ -80,8 +80,11 @@ public sealed class SlimeController : MonoBehaviour
     public int Pieces { get; private set; }
     public float Health { get; private set; }
     public bool IsInFlight => launched;
+    public bool CanRam(float requiredSpeedFraction) => CanLaunch && launched &&
+        incomingVelocity.sqrMagnitude >= Mathf.Pow(launchSpeed * requiredSpeedFraction, 2f);
     public int MaxHealth => maxHealth;
     public bool CanLaunch { get; set; } = true;
+    public bool CanDamageGrandma { get; set; } = true;
     public event System.Action PieceCollected;
     public event System.Action HealthChanged;
 
@@ -377,7 +380,7 @@ public sealed class SlimeController : MonoBehaviour
 
         if (collision.contactCount > 0)
             SlidePastActor(collision.GetContact(0).normal);
-        if (!hitEnemy)
+        if (!hitEnemy && CanDamageGrandma)
             actor.TakeHit(.5f, incomingVelocity);
     }
 

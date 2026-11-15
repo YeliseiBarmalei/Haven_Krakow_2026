@@ -168,22 +168,13 @@ public sealed class Shooter : MonoBehaviour
             return;
         }
         var direction = offset.normalized;
-        if (aimFrame != null && shotAnimationRemaining <= 0f)
-        {
-            FaceHorizontally(direction.x);
-            visual.sprite = cooldown <= .14f ? aimFrame : idleFrame;
-        }
+        AimAt(direction, cooldown);
         var muzzle = health.Center + direction * DistanceToEdge(health.HitBounds, direction);
         if (cooldown <= 0)
         {
             lastShotOrigin = muzzle;
             lastShotSide = Vector2.Perpendicular(direction);
-            level.Fire(muzzle, direction * bulletSpeed);
-            if (shotFrames != null && shotFrames.Length > 0)
-            {
-                shotAnimationRemaining = shotFrameDuration * shotFrames.Length;
-                visual.sprite = shotFrames[0];
-            }
+            FireShot(level, muzzle, direction);
             shotsLeft--;
             cooldown = shotInterval;
             HideWarning();
@@ -204,15 +195,61 @@ public sealed class Shooter : MonoBehaviour
             return;
         }
 
+        ShowShotWarning(target, muzzle, direction, cooldown, warningWindow, aggressive);
+    }
+
+    private void ShowShotWarning(ActorHealth target, Vector2 muzzle, Vector2 direction,
+        float timeUntilShot, float warningWindow, bool aggressive)
+    {
         var length = Mathf.Max(0f, Vector2.Dot(target.Center - muzzle, direction) - DistanceToEdge(target.HitBounds, direction));
         var angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
         warning.transform.SetPositionAndRotation(muzzle + direction * (length * .5f), Quaternion.Euler(0, 0, angle));
         var scale = transform.lossyScale;
         warning.transform.localScale = new Vector3(length / (warningSize.x * scale.x), .042f / (warningSize.y * scale.y), 1f);
-        var charge = 1f - Mathf.Clamp01(cooldown / Mathf.Max(.01f, warningWindow));
+        var charge = 1f - Mathf.Clamp01(timeUntilShot / Mathf.Max(.01f, warningWindow));
         var tint = aggressive ? new Color(1f, .67f, .23f) : warningTint;
         warning.color = new Color(tint.r, tint.g, tint.b, Mathf.Lerp(.25f, .9f, charge));
         warning.enabled = true;
+    }
+
+    public float PracticeWarningDuration => warningDuration;
+
+    public void AimPracticeShot(LevelController level, ActorHealth target, float timeUntilShot)
+    {
+        if (timeUntilShot > warningDuration)
+            return;
+
+        var direction = (target.Center - health.Center).normalized;
+        AimAt(direction, timeUntilShot);
+        var muzzle = health.Center + direction * DistanceToEdge(health.HitBounds, direction);
+        if (timeUntilShot > 0f)
+            ShowShotWarning(target, muzzle, direction, timeUntilShot, warningDuration, false);
+        else
+        {
+            FireShot(level, muzzle, direction);
+            HideWarning();
+        }
+    }
+
+    private void AimAt(Vector2 direction, float timeUntilShot)
+    {
+        if (aimFrame == null || shotAnimationRemaining > 0f)
+            return;
+
+        FaceHorizontally(direction.x);
+        visual.sprite = timeUntilShot <= .14f ? aimFrame : idleFrame;
+    }
+
+    public void TickPracticeAnimation(float step) => UpdateShotAnimation(step);
+
+    private void FireShot(LevelController level, Vector2 muzzle, Vector2 direction)
+    {
+        level.Fire(muzzle, direction * bulletSpeed);
+        if (shotFrames != null && shotFrames.Length > 0)
+        {
+            shotAnimationRemaining = shotFrameDuration * shotFrames.Length;
+            visual.sprite = shotFrames[0];
+        }
     }
 
     private void FaceHorizontally(float horizontal)

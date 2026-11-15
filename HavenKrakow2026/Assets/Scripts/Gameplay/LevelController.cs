@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public sealed class LevelController : MonoBehaviour
+public sealed partial class LevelController : MonoBehaviour
 {
     [System.Serializable]
     private struct EnemySpawn
@@ -18,6 +18,8 @@ public sealed class LevelController : MonoBehaviour
     private sealed class Wave
     {
         public EnemySpawn[] shooters;
+        [Tooltip("Normalized entry positions along the arena edges.")]
+        public Vector2[] kamikazes = System.Array.Empty<Vector2>();
         [Min(0f), Tooltip("Seconds between fireballs. Lower values spawn them more often. Zero disables the event.")]
         public float fireballInterval;
     }
@@ -33,6 +35,7 @@ public sealed class LevelController : MonoBehaviour
     [SerializeField] private SpriteRenderer floor;
     [SerializeField] private Transform leftWall, rightWall, topWall, bottomWall;
     [SerializeField] private Shooter shooterPrefab;
+    [SerializeField] private Kamikaze kamikazePrefab;
     [SerializeField] private Wave[] waves;
     [SerializeField] private LevelBalance balance;
     [SerializeField] private Material fireballMaterial;
@@ -89,6 +92,7 @@ public sealed class LevelController : MonoBehaviour
     private string VictoryScene => string.IsNullOrEmpty(nextLevelScene) ? mainMenuScene : nextLevelScene;
     private float fireballTimer;
     private readonly List<FireballHazard> fireballs = new();
+    private readonly List<Kamikaze> kamikazes = new();
 
     public Bounds ArenaBounds => arenaBounds.bounds;
     public float ProjectileRadius => projectilePrefab.GetComponent<CircleCollider2D>().radius * projectilePrefab.transform.localScale.x;
@@ -103,7 +107,15 @@ public sealed class LevelController : MonoBehaviour
         grandma.Changed += OnGrandmaHealthChanged;
         pieceTimer = balance.pieceInterval;
         Canvas.ForceUpdateCanvases();
-        SpawnWave();
+        if (tutorialNotice != null)
+        {
+            tutorialStart = slime.Position;
+            SpawnTutorialShooter();
+            BeginTutorialStep(TutorialStep.Launch);
+            UpdateStatus();
+        }
+        else
+            SpawnWave();
     }
 
     private void Update()
@@ -117,16 +129,27 @@ public sealed class LevelController : MonoBehaviour
         if (finished || Time.timeScale <= 0f || FadeTransition.IsBusy)
             return;
 
+        if (tutorialStep != TutorialStep.None)
+        {
+            UpdateTutorial();
+            return;
+        }
+
         if (slime.Pieces - spentPieces >= UpgradeCost)
         {
-            GameAudio.Play(levelUpSound, .85f);
-            upgradeMenu.Open(slimeLevel + 1, slime.CanUpgradeSize, slime.SizeUpgradePercent, ChooseUpgrade);
+            OpenUpgradeMenu();
             return;
         }
 
         UpdateSlowMotion();
         UpdateSwap();
         UpdateShield();
+    }
+
+    private void OpenUpgradeMenu()
+    {
+        GameAudio.Play(levelUpSound, .85f);
+        upgradeMenu.Open(slimeLevel + 1, slime.CanUpgradeSize, slime.SizeUpgradePercent, ChooseUpgrade);
     }
 
     private void UpdateSlowMotion()
@@ -154,11 +177,12 @@ public sealed class LevelController : MonoBehaviour
         GameAudio.SetPlaybackSpeed(1f);
     }
 
-    private void UpdateSwap()
+    private bool UpdateSwap()
     {
         swapRecharge = Mathf.Max(0f, swapRecharge - Time.deltaTime);
         var target = swapRecharge == 0f ? FindSwapTarget() : null;
-        if (target != null && Application.isFocused && Keyboard.current?.eKey.wasPressedThisFrame == true)
+        var swapped = target != null && Application.isFocused && Keyboard.current?.eKey.wasPressedThisFrame == true;
+        if (swapped)
         {
             var origin = slime.Position;
             slime.SwapTo(target.Position);
@@ -170,6 +194,7 @@ public sealed class LevelController : MonoBehaviour
         }
 
         hud.SetSwap(swapRecharge, balance.swapCooldown, target != null);
+        return swapped;
     }
 
     private void UpdateShield()
@@ -292,6 +317,12 @@ public sealed class LevelController : MonoBehaviour
             return;
         }
 
+        if (tutorialStep != TutorialStep.None)
+        {
+            TickTutorial();
+            return;
+        }
+
         MoveBullets();
         previousSlimePosition = slime.Position;
         if (finished)
@@ -305,7 +336,18 @@ public sealed class LevelController : MonoBehaviour
             moreShots |= shooter.HasShots;
         }
 
-        var underAttack = moreShots || bullets.Count > 0;
+        for (var i = kamikazes.Count - 1; i >= 0; i--)
+        {
+            var runner = kamikazes[i];
+            if (runner != null)
+                runner.Tick(arenaStep);
+            if (runner == null || !runner.IsActive)
+                kamikazes.RemoveAt(i);
+            if (finished)
+                return;
+        }
+
+        var underAttack = moreShots || bullets.Count > 0 || kamikazes.Count > 0;
         UpdateFireballs(arenaStep, underAttack);
         if (finished)
             return;
@@ -438,12 +480,33 @@ public sealed class LevelController : MonoBehaviour
             shooters.Add(shooter);
             hud.TrackEnemy(shooter);
         }
+        if (kamikazePrefab != null)
+        {
+            foreach (var position in waves[wave - 1].kamikazes)
+            {
+                var offset = Vector2.Max(-Vector2.one, Vector2.Min(Vector2.one, position));
+                var runner = Instantiate(kamikazePrefab, center, Quaternion.identity, enemies);
+                var entry = center + Vector2.Scale(offset, bounds.extents);
+                var margin = runner.GetComponent<SpriteRenderer>().bounds.extents;
+                if (Mathf.Abs(offset.x) >= Mathf.Abs(offset.y))
+                    entry.x = center.x + Mathf.Sign(offset.x) * (bounds.extents.x + margin.x + .5f);
+                else
+                    entry.y = center.y + Mathf.Sign(offset.y) * (bounds.extents.y + margin.y + .5f);
+                runner.Begin(entry, grandma, this);
+                kamikazes.Add(runner);
+            }
+        }
         var fireballInterval = waves[wave - 1].fireballInterval;
         if (fireballInterval > 0f)
             SpawnFireball(fireballInterval);
 
         UpdateStatus();
         ShowWaveNotice();
+    }
+
+    public void RegisterKamikazeDefeat()
+    {
+        enemiesDefeated++;
     }
 
     private void ShowWaveNotice()
@@ -546,7 +609,8 @@ public sealed class LevelController : MonoBehaviour
             }
 
             // Use relative motion so a fast-moving slime cannot pass through a shot between physics steps.
-            var slimeHit = EntryTime(start - previousSlimePosition, end - slimePosition, slime.Radius + bullet.Radius);
+            var slimeHit = tutorialStep == TutorialStep.Shield ? float.PositiveInfinity :
+                EntryTime(start - previousSlimePosition, end - slimePosition, slime.Radius + bullet.Radius);
             var grandmaHit = BoxEntryTime(start - (Vector2)grandmaBounds.center, end - (Vector2)grandmaBounds.center,
                 grandmaBounds.extents, bullet.Radius);
             var shieldHit = shieldRemaining > 0f
@@ -564,7 +628,8 @@ public sealed class LevelController : MonoBehaviour
                 if (!slime.IsInFlight)
                 {
                     RemoveBullet(index);
-                    slime.TakeHit(bullet.Velocity);
+                    if (tutorialStep == TutorialStep.None)
+                        slime.TakeHit(bullet.Velocity);
                     continue;
                 }
 
@@ -575,7 +640,8 @@ public sealed class LevelController : MonoBehaviour
             if (grandmaHit <= 1f)
             {
                 RemoveBullet(index);
-                grandma.TakeHit(direction: bullet.Velocity);
+                if (tutorialStep == TutorialStep.None)
+                    grandma.TakeHit(direction: bullet.Velocity);
                 continue;
             }
 
@@ -591,7 +657,10 @@ public sealed class LevelController : MonoBehaviour
         var bullet = bullets[index];
         var impact = Vector2.Lerp(start, end, hitTime);
         bullet.Deflect(impact, hitTime, returnBoost, ArenaSpeed);
-        parries++;
+        if (tutorialStep == TutorialStep.None)
+            parries++;
+        else if (tutorialStep == TutorialStep.Reflect || tutorialStep == TutorialStep.Shield)
+            tutorialReflected = true;
         GameAudio.Play(sound, .8f);
         if (HitShooter(impact, bullet.Position, bullet.Radius))
             RemoveBullet(index);
@@ -627,8 +696,9 @@ public sealed class LevelController : MonoBehaviour
 
         if (target == null)
             return false;
-        target.TakeHit(reflectedDamage, end - start);
-        if (target.Current == 0)
+        if (tutorialStep == TutorialStep.None || tutorialStep == TutorialStep.Reflect || tutorialStep == TutorialStep.Shield)
+            target.TakeHit(reflectedDamage, end - start);
+        if (target.Current == 0 && tutorialStep == TutorialStep.None)
             enemiesDefeated++;
         return true;
     }
@@ -735,6 +805,9 @@ public sealed class LevelController : MonoBehaviour
         }
         foreach (var fireball in fireballs)
             Destroy(fireball.gameObject);
+        foreach (var runner in kamikazes)
+            if (runner != null)
+                runner.Stop();
 
         var heading = victory ? message : $"{message} on wave {wave}";
         result.text = $"{heading}\nParries {parries}   |   Enemies defeated {enemiesDefeated}";
@@ -782,5 +855,7 @@ public sealed class LevelController : MonoBehaviour
                 break;
         }
         UpdateStatus();
+        if (tutorialStep == TutorialStep.Upgrade)
+            CompleteTutorial();
     }
 }

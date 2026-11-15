@@ -151,7 +151,7 @@ MonoBehaviour:
   growthPerPiece: 0.17
   aimShaft: {fileID: 111}
   aimHead: {fileID: 121}
-  maxHealth: 5
+  maxHealth: 3
   hitCooldown: 1
   flightTint: {r: 0.8, g: 0.94, b: 1, a: 1}
   idleSprite: {fileID: 6312315070412584015, guid: 8d842d19d1af1af4bbd89c426f52c18b, type: 3}
@@ -164,12 +164,15 @@ MonoBehaviour:
   idleFramesPerSecond: 8
   flightSprite: {fileID: -5010991357390200157, guid: 61179f6e83af7cd45bba58149e6687bf, type: 3}
   slideSound: {fileID: 8300000, guid: 7a0bde343ce74924a52e03755fbe42fb, type: 3}
+  damageSound: {fileID: 0}
   afterimageCount: 14
   afterimageInterval: 0.025
   afterimageLifetime: 0.48
+  afterimageSpacing: 0.13
+  afterimageCyan: {r: 0.18, g: 1, b: 0.85, a: 0.72}
+  afterimageViolet: {r: 0.74, g: 0.32, b: 1, a: 0.65}
   slowMotionMovementSound: {fileID: 8300000, guid: a9c8c0764cbb473ea75ce29304ac94bf, type: 3}
   slowMotionMovementVolume: 0.55
-  damageSound: {fileID: 0}
 --- !u!50 &105
 Rigidbody2D:
   serializedVersion: 5

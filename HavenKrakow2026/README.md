@@ -4,6 +4,8 @@ See [the game design document](DESIGN.md) for the current rules, level script, a
 
 Open `MainMenu` and choose **Levels**. Level 1 is available immediately. Winning it unlocks Level 2 in the menu and enables the **Next Level** route from the results screen. Open `Level01` or `Level02` directly to test either level.
 
+Edit the level picker in `Assets/Scenes/LevelSelect.unity` and the practice arena in `Assets/Scenes/Levels/Tutorial.unity`. First-time players enter the practice scene before Level 1. Completing practice loads a fresh Level 1 run.
+
 ## Current gameplay
 
 - Drag and release the slime to aim a launch and set its power. Protect Grandma by intercepting enemy shots and collect slime pieces to choose upgrades.
